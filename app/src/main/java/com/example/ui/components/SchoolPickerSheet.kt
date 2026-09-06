@@ -1,0 +1,330 @@
+package com.example.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.model.School
+import com.example.ui.theme.BlueAccent
+import com.example.ui.theme.EmeraldGreen
+import com.example.ui.theme.Navy700
+import com.example.ui.theme.Navy900
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SchoolPickerSheet(
+    allSchools: List<School>,
+    selectedSchools: List<School>,
+    onSelectSchool: (School) -> Unit,
+    onToggleSchool: (School) -> Unit,
+    onConfirmSelection: () -> Unit,
+    onDismiss: () -> Unit,
+    isTamil: Boolean,
+    isMultiSelect: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("ALL") }
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val categories = listOf(
+        "ALL" to if (isTamil) "அனைத்தும் (119)" else "All (119)",
+        "PUPS" to if (isTamil) "தொடக்கப்பள்ளி (PUPS)" else "Primary (PUPS)",
+        "PUMS" to if (isTamil) "நடுநிலைப்பள்ளி (PUMS)" else "Middle (PUMS)",
+        "AIDED_PRIMARY" to if (isTamil) "உதவி தொடக்கப்பள்ளி" else "Aided Primary",
+        "AIDED_MIDDLE" to if (isTamil) "உதவி நடுநிலைப்பள்ளி" else "Aided Middle",
+        "OTHER" to if (isTamil) "அலுவலகம் / நீதிமன்றம்" else "Offices / Court"
+    )
+
+    val filteredSchools = allSchools.filter { school ->
+        val matchesCategory = if (selectedCategory == "ALL") true else school.category == selectedCategory
+        val query = searchQuery.trim().lowercase()
+        val matchesQuery = if (query.isEmpty()) true else {
+            school.nameEn.lowercase().contains(query) ||
+            school.nameTa.contains(query) ||
+            school.serialNo.toString() == query ||
+            school.code.lowercase().contains(query)
+        }
+        matchesCategory && matchesQuery
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+        modifier = modifier.fillMaxHeight(0.9f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.School,
+                        contentDescription = "Schools",
+                        tint = Navy700,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isTamil) "பள்ளிகள் பட்டியல் (119 Schools)" else "School Directory (119 Schools)",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Navy900
+                    )
+                }
+
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                }
+            }
+
+            // Search Bar
+            AppOutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .testTag("school_search_input"),
+                placeholder = {
+                    Text(if (isTamil) "பள்ளி பெயர் அல்லது ஊர் தேடுக..." else "Search school name or village...")
+                },
+                leadingIcon = {
+                    Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = TextSecondary)
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Clear")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            // Category Filter Chips
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                items(categories) { (key, label) ->
+                    FilterChip(
+                        selected = selectedCategory == key,
+                        onClick = { selectedCategory = key },
+                        label = { Text(label, fontSize = 11.5.sp) }
+                    )
+                }
+            }
+
+            // Selected count banner if multi-select
+            if (isMultiSelect && selectedSchools.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = if (isTamil) "${selectedSchools.size} பள்ளிகள் தேர்ந்தெடுக்கப்பட்டுள்ளன" else "${selectedSchools.size} schools selected",
+                            color = EmeraldGreen,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Button(
+                            onClick = onConfirmSelection,
+                            modifier = Modifier.testTag("confirm_school_selection_btn")
+                        ) {
+                            Text(if (isTamil) "சரி (Confirm)" else "Confirm")
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Schools List
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                items(filteredSchools, key = { it.id }) { school ->
+                    val isSelected = selectedSchools.any { it.id == school.id }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (isMultiSelect) {
+                                    onToggleSchool(school)
+                                } else {
+                                    onSelectSchool(school)
+                                }
+                            }
+                            .testTag("school_item_${school.serialNo}"),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) Color(0xFFE3F2FD) else Color(0xFFFAFAFA)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) BlueAccent else Color(0xFFECEFF1)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = school.serialNo.toString(),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Navy900
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column {
+                                    Text(
+                                        text = if (isTamil && school.nameTa.isNotEmpty()) school.nameTa else school.nameEn,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                    if (isTamil && school.nameTa.isNotEmpty()) {
+                                        Text(
+                                            text = school.nameEn,
+                                            fontSize = 11.sp,
+                                            color = TextSecondary
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Distance & Fare Badge
+                            Column(horizontalAlignment = Alignment.End) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFFFF8E1)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Place,
+                                            contentDescription = "Distance",
+                                            tint = Color(0xFFE65100),
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text(
+                                            text = "${school.distanceFromHqKm} km",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFE65100)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "₹${school.defaultBusFare} fare",
+                                    fontSize = 10.5.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

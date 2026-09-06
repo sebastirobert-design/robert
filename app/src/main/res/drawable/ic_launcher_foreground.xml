@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Center 66dp area safe zone: (21,21) to (87,87) -->
+    <group
+        android:translateX="18"
+        android:translateY="18"
+        android:scaleX="0.67"
+        android:scaleY="0.67">
+        
+        <!-- Document / Tour Diary Base Sheet with subtle shadow -->
+        <path
+            android:fillColor="#15000000"
+            android:pathData="M32,24 L82,24 C85.3,24 88,26.7 88,30 L88,94 C88,97.3 85.3,100 82,100 L26,100 C22.7,100 20,97.3 20,94 L20,36 Z" />
+            
+        <!-- Document Main Card -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,22 L80,22 C83.3,22 86,24.7 86,28 L86,92 C86,95.3 83.3,98 80,98 L24,98 C20.7,98 18,95.3 18,92 L18,34 Z" />
+            
+        <!-- Header Banner (Navy) -->
+        <path
+            android:fillColor="#1A237E"
+            android:pathData="M18,28 C18,24.7 20.7,22 24,22 L80,22 C83.3,22 86,24.7 86,28 L86,40 L18,40 Z" />
+
+        <!-- Header Title Lines on Doc -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M26,30 L54,30 A2,2 0 0,1 54,34 L26,34 A2,2 0 0,1 26,30 Z" />
+        <path
+            android:fillColor="#FFD54F"
+            android:pathData="M60,30 L78,30 A2,2 0 0,1 78,34 L60,34 A2,2 0 0,1 60,30 Z" />
+
+        <!-- Table Row 1 (Diary row) -->
+        <path
+            android:fillColor="#E0E0E0"
+            android:pathData="M26,48 L78,48 A2,2 0 0,1 78,52 L26,52 A2,2 0 0,1 26,48 Z" />
+            
+        <!-- Table Row 2 -->
+        <path
+            android:fillColor="#E0E0E0"
+            android:pathData="M26,58 L64,58 A2,2 0 0,1 64,62 L26,62 A2,2 0 0,1 26,58 Z" />
+
+        <!-- Table Row 3 -->
+        <path
+            android:fillColor="#E0E0E0"
+            android:pathData="M26,68 L50,68 A2,2 0 0,1 50,72 L26,72 A2,2 0 0,1 26,68 Z" />
+
+        <!-- Bus Emblem / Badge (Amber Circle with Bus) -->
+        <path
+            android:fillColor="#FF8F00"
+            android:pathData="M68,76 m-18,0 a18,18 0 1,0 36,0 a18,18 0 1,0 -36,0" />
+            
+        <!-- Bus Silhouette inside badge -->
+        <!-- Bus Body -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M59,68 C59,66.5 60.5,65 62,65 L74,65 C75.5,65 77,66.5 77,68 L77,81 C77,82 76,83 75,83 L75,85 C75,85.5 74.5,86 74,86 L73,86 C72.5,86 72,85.5 72,85 L72,83 L64,83 L64,85 C64,85.5 63.5,86 63,86 L62,86 C61.5,86 61,85.5 61,85 L61,83 C60,83 59,82 59,81 Z" />
+            
+        <!-- Bus Windshield -->
+        <path
+            android:fillColor="#FF8F00"
+            android:pathData="M61,68 L75,68 L75,73 L61,73 Z" />
+            
+        <!-- Bus Headlights -->
+        <path
+            android:fillColor="#FF8F00"
+            android:pathData="M62,77 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+        <path
+            android:fillColor="#FF8F00"
+            android:pathData="M74,77 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+
+        <!-- Checkmark Badge on top right -->
+        <path
+            android:fillColor="#00C853"
+            android:pathData="M78,16 m-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+        <!-- Checkmark stroke -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M74,16 L76.5,18.5 L82,13 L83.5,14.5 L76.5,21.5 L72.5,17.5 Z" />
+    </group>
+</vector>

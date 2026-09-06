@@ -1,0 +1,6 @@
+{
+  "name": "TA Bill & Diary",
+  "description": "100% offline Travel Allowance (TA) Bill and Tour Diary generator with Room database local persistence, Form 1 Tour Diary, Form 2 TA Bill with all 20 columns, and 119 schools directory.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
