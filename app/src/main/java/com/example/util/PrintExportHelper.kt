@@ -36,6 +36,7 @@ object PrintExportHelper {
                 <meta charset="utf-8">
                 <title>Tour Diary - $monthTa</title>
                 <style>
+                    @page { size: A4 portrait; margin: 8mm; }
                     body { font-family: 'Noto Sans Tamil', 'Segoe UI', Arial, sans-serif; font-size: 11px; width: 100%; margin: 0; padding: 12px; background-color: #f8fafc; color: #000; box-sizing: border-box; }
                     .header-title { text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 4px; }
                     .header-sub { text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 12px; }
@@ -48,7 +49,11 @@ object PrintExportHelper {
                     .num-header { font-size: 9px; font-weight: normal; }
                     .holiday-row { background-color: #fafafa; font-style: italic; }
                     .footer-sig { margin-top: 30px; width: 100%; display: flex; justify-content: space-between; }
-                    @media print { .no-print { display: none !important; } }
+                    @media print {
+                        @page { size: A4 portrait; margin: 8mm; }
+                        body { width: 100%; margin: 0; padding: 0; background-color: #fff; }
+                        .no-print { display: none !important; }
+                    }
                 </style>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
                 <script>
@@ -60,7 +65,7 @@ object PrintExportHelper {
                                 filename: 'Tour_Diary_${monthYear.replace("-", "_")}.pdf',
                                 image: { type: 'jpeg', quality: 0.98 },
                                 html2canvas: { scale: 2, useCORS: true },
-                                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
                             };
                             if (window.html2pdf) {
                                 html2pdf().set(opt).from(el).save();
@@ -174,6 +179,7 @@ object PrintExportHelper {
         entries: List<TourEntry>
     ): String {
         val monthBillHeader = DateUtils.getBillMonthHeader(monthYear)
+        val englishMonth = DateUtils.getEnglishMonthDisplay(monthYear)
         val basicPayFormatted = String.format("%.0f", officer.basicPay)
         val travelEntries = entries.filter { !it.isNonTravel }
 
@@ -194,7 +200,7 @@ object PrintExportHelper {
                 <meta charset="utf-8">
                 <title>TA Bill - $monthBillHeader</title>
                 <style>
-                    @page { size: landscape; margin: 10mm; }
+                    @page { size: A4 landscape; margin: 6mm; }
                     body { font-family: 'Noto Sans Tamil', 'Segoe UI', Arial, sans-serif; font-size: 9.5px; width: 100%; margin: 0; padding: 10px; background-color: #f8fafc; color: #000; box-sizing: border-box; }
                     .bill-header-box { border: 1.5px solid #000; padding: 6px 10px; margin-bottom: 6px; }
                     .top-table { width: 100%; border: none; font-size: 10px; font-weight: bold; }
@@ -207,7 +213,11 @@ object PrintExportHelper {
                     .num-row th { font-size: 8px; font-weight: normal; background-color: #fafafa; }
                     .total-row { font-weight: bold; background-color: #e8e8e8; }
                     .cert-box { margin-top: 15px; font-size: 9px; line-height: 1.4; border: 1px solid #999; padding: 8px; }
-                    @media print { .no-print { display: none !important; } }
+                    @media print {
+                        @page { size: A4 landscape; margin: 6mm; }
+                        body { width: 100%; margin: 0; padding: 0; background-color: #fff; }
+                        .no-print { display: none !important; }
+                    }
                 </style>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
                 <script>
@@ -241,7 +251,7 @@ object PrintExportHelper {
                 <div class="bill-header-box">
                     <table class="top-table">
                         <tr>
-                            <td style="width: 75%;">Travelling Allowance Bill of the Establishment of ${officer.designation} Ilayankudi,Sivagangai Dt for the month of <u>$monthBillHeader</u></td>
+                            <td style="width: 75%;">Travelling Allowance Bill of the <b><u>$englishMonth ($monthBillHeader)</u></b> Establishment of ${officer.designation} Ilayankudi,Sivagangai Dt</td>
                             <td style="width: 25%; text-align: right;">BASICPAY-Rs: <b>$basicPayFormatted</b></td>
                         </tr>
                         <tr>
@@ -375,7 +385,7 @@ object PrintExportHelper {
         return sb.toString()
     }
 
-    fun printHtmlDocument(context: Context, htmlContent: String, jobName: String) {
+    fun printHtmlDocument(context: Context, htmlContent: String, jobName: String, isLandscape: Boolean = false) {
         try {
             val webView = WebView(context)
             webView.webViewClient = object : WebViewClient() {
@@ -384,8 +394,13 @@ object PrintExportHelper {
                         val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
                         if (printManager != null) {
                             val printAdapter = webView.createPrintDocumentAdapter(jobName)
+                            val mediaSize = if (isLandscape) {
+                                PrintAttributes.MediaSize.ISO_A4.asLandscape()
+                            } else {
+                                PrintAttributes.MediaSize.ISO_A4.asPortrait()
+                            }
                             val printAttributes = PrintAttributes.Builder()
-                                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                                .setMediaSize(mediaSize)
                                 .setResolution(PrintAttributes.Resolution("id", "print", 300, 300))
                                 .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
                                 .build()
@@ -460,8 +475,8 @@ object PrintExportHelper {
         val pdfFile = File(exportDir, "Tour_Diary_${safeMonth}.pdf")
 
         val pdfDocument = PdfDocument()
-        val pageWidth = 842
-        val pageHeight = 595
+        val pageWidth = 595 // A4 Portrait width
+        val pageHeight = 842 // A4 Portrait height
         var pageNumber = 1
         var pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
         var page = pdfDocument.startPage(pageInfo)
@@ -469,11 +484,11 @@ object PrintExportHelper {
 
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
-            textSize = 8.5f
+            textSize = 8f
         }
         val boldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
-            textSize = 9f
+            textSize = 8.5f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -484,7 +499,7 @@ object PrintExportHelper {
         }
         val subTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
-            textSize = 10f
+            textSize = 9.5f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
@@ -502,8 +517,9 @@ object PrintExportHelper {
             style = Paint.Style.FILL
         }
 
-        val leftMargin = 30f
-        val colWidths = floatArrayOf(110f, 65f, 45f, 110f, 65f, 45f, 197f, 85f, 60f)
+        val leftMargin = 18f
+        // 9 columns: Dep(Station 76, Date 48, Hour 44) + Arr(Station 76, Date 48, Hour 44) + Purpose 137 + Kind 54 + Km 32 = 559f
+        val colWidths = floatArrayOf(76f, 48f, 44f, 76f, 48f, 44f, 137f, 54f, 32f)
         val totalTableWidth = colWidths.sum()
 
         fun drawHeader(canvas: Canvas, currentY: Float): Float {
@@ -520,11 +536,11 @@ object PrintExportHelper {
 
             val depWidth = colWidths[0] + colWidths[1] + colWidths[2]
             val arrWidth = colWidths[3] + colWidths[4] + colWidths[5]
-            canvas.drawText("DEPARTURE", leftMargin + depWidth / 2f - 25f, y + 12f, boldPaint)
+            canvas.drawText("DEPARTURE", leftMargin + depWidth / 2f - 26f, y + 12f, boldPaint)
             canvas.drawText("ARRIVAL", leftMargin + depWidth + arrWidth / 2f - 20f, y + 12f, boldPaint)
-            canvas.drawText("Purpose of journey", leftMargin + depWidth + arrWidth + 10f, y + 18f, boldPaint)
-            canvas.drawText("Kind", leftMargin + depWidth + arrWidth + colWidths[6] + 15f, y + 18f, boldPaint)
-            canvas.drawText("No. km", leftMargin + depWidth + arrWidth + colWidths[6] + colWidths[7] + 8f, y + 18f, boldPaint)
+            canvas.drawText("Purpose of journey", leftMargin + depWidth + arrWidth + 6f, y + 18f, boldPaint)
+            canvas.drawText("Kind", leftMargin + depWidth + arrWidth + colWidths[6] + 8f, y + 18f, boldPaint)
+            canvas.drawText("No. km", leftMargin + depWidth + arrWidth + colWidths[6] + colWidths[7] + 2f, y + 18f, boldPaint)
 
             val subY = y + 18f
             canvas.drawLine(leftMargin, subY, leftMargin + depWidth + arrWidth, subY, linePaint)
@@ -532,7 +548,7 @@ object PrintExportHelper {
             var curX = leftMargin
             val subLabels = arrayOf("station", "date", "hour", "station", "date", "hour")
             for (i in 0 until 6) {
-                canvas.drawText(subLabels[i], curX + 4f, subY + 11f, textPaint)
+                canvas.drawText(subLabels[i], curX + 3f, subY + 11f, textPaint)
                 curX += colWidths[i]
             }
 
@@ -540,7 +556,7 @@ object PrintExportHelper {
             canvas.drawLine(leftMargin, numY, leftMargin + totalTableWidth, numY, linePaint)
             curX = leftMargin
             for (i in 1..9) {
-                canvas.drawText("$i", curX + colWidths[i - 1] / 2f - 3f, numY + 9f, textPaint)
+                canvas.drawText("$i", curX + colWidths[i - 1] / 2f - 2.5f, numY + 9f, textPaint)
                 curX += colWidths[i - 1]
             }
 
@@ -602,9 +618,9 @@ object PrintExportHelper {
             for (i in values.indices) {
                 canvas.drawLine(curX, y, curX, y + rowHeight, linePaint)
                 val v = values[i]
-                val maxLen = (colWidths[i] / 5.2f).toInt()
+                val maxLen = (colWidths[i] / 4.8f).toInt()
                 val printV = if (v.length > maxLen) v.take(maxLen - 2) + ".." else v
-                canvas.drawText(printV, curX + 4f, y + 11.5f, textPaint)
+                canvas.drawText(printV, curX + 2.5f, y + 11.5f, textPaint)
                 curX += colWidths[i]
             }
             canvas.drawLine(curX, y, curX, y + rowHeight, linePaint)
@@ -615,16 +631,16 @@ object PrintExportHelper {
         val totalKms = entries.filter { !it.isNonTravel }.sumOf { it.distanceKm }
         canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + rowHeight, headerBgPaint)
         canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + rowHeight, linePaint)
-        canvas.drawText("TOTAL KMs (மொத்த கி.மீ):", leftMargin + totalTableWidth - 160f, y + 11.5f, boldPaint)
-        canvas.drawText("$totalKms", leftMargin + totalTableWidth - 45f, y + 11.5f, boldPaint)
+        canvas.drawText("TOTAL KMs (மொத்த கி.மீ):", leftMargin + totalTableWidth - 145f, y + 11.5f, boldPaint)
+        canvas.drawText("$totalKms", leftMargin + totalTableWidth - 26f, y + 11.5f, boldPaint)
         y += rowHeight + 25f
 
-        canvas.drawText("Date: ________________", leftMargin + 10f, y, textPaint)
-        canvas.drawText("Station: ${officer.headquarters}", leftMargin + 10f, y + 14f, textPaint)
+        canvas.drawText("Date: ________________", leftMargin + 8f, y, textPaint)
+        canvas.drawText("Station: ${officer.headquarters}", leftMargin + 8f, y + 14f, textPaint)
 
-        canvas.drawText(officer.name, leftMargin + totalTableWidth - 160f, y, boldPaint)
-        canvas.drawText(officer.designation, leftMargin + totalTableWidth - 160f, y + 14f, textPaint)
-        canvas.drawText(officer.headquarters, leftMargin + totalTableWidth - 160f, y + 26f, textPaint)
+        canvas.drawText(officer.name, leftMargin + totalTableWidth - 150f, y, boldPaint)
+        canvas.drawText(officer.designation, leftMargin + totalTableWidth - 150f, y + 14f, textPaint)
+        canvas.drawText(officer.headquarters, leftMargin + totalTableWidth - 150f, y + 26f, textPaint)
 
         pdfDocument.finishPage(page)
 
@@ -694,11 +710,12 @@ object PrintExportHelper {
         fun drawHeader(canvas: Canvas, currentY: Float): Float {
             var y = currentY
             val monthBillHeader = DateUtils.getBillMonthHeader(monthYear)
+            val englishMonth = DateUtils.getEnglishMonthDisplay(monthYear)
             val basicPayFormatted = String.format("%.0f", officer.basicPay)
 
             canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + 24f, linePaint)
             canvas.drawText(
-                "Travelling Allowance Bill of the Establishment of ${officer.designation} ${officer.headquarters} for the month of $monthBillHeader",
+                "Travelling Allowance Bill of the $englishMonth ($monthBillHeader) Establishment of ${officer.designation} ${officer.headquarters}",
                 leftMargin + 6f,
                 y + 11f,
                 boldPaint

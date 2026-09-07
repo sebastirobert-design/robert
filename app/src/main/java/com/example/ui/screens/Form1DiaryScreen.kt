@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.TourEntry
@@ -86,65 +88,104 @@ fun Form1DiaryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(
                         imageVector = Icons.Default.Article,
                         contentDescription = "Form 1",
                         tint = Color(0xFF00796B),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Text(
                             text = if (isTa) "படிவம் 1: நாள்காட்டி (DIARY)" else "FORM 1: TOUR DIARY",
-                            fontSize = 15.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Navy900
+                            color = Navy900,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "9 Columns • $monthTa",
-                            fontSize = 11.sp,
-                            color = TextSecondary
+                            fontSize = 10.5.sp,
+                            color = TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(
-                        onClick = onExportToCsv,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color(0xFFF0FDF4),
-                            contentColor = Color(0xFF15803D)
-                        ),
-                        border = BorderStroke(1.dp, Color(0xFF16A34A)),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.testTag("form1_export_csv_btn")
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // PDF Button (Compact)
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Navy700,
+                        modifier = Modifier
+                            .clickable { onPrintDiary() }
+                            .testTag("form1_print_btn")
                     ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "CSV", modifier = Modifier.size(14.dp), tint = Color(0xFF15803D))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("Excel", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF15803D))
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Print,
+                                contentDescription = "PDF",
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "PDF",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
 
-                    Button(
-                        onClick = onPrintDiary,
-                        colors = ButtonDefaults.buttonColors(containerColor = Navy700),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.testTag("form1_print_btn")
+                    // Excel Button (Compact)
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFF107C41),
+                        modifier = Modifier
+                            .clickable { onExportToCsv() }
+                            .testTag("form1_export_csv_btn")
                     ) {
-                        Icon(imageVector = Icons.Default.Print, contentDescription = "PDF Download", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (isTa) "PDF பதிவிறக்கம்" else "PDF Download", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    IconButton(
-                        onClick = onShareDiary,
-                        modifier = Modifier.testTag("form1_share_btn")
-                    ) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "Share", tint = Color(0xFF2E7D32))
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Excel",
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "Excel",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
                 }
             }

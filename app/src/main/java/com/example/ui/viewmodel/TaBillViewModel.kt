@@ -398,6 +398,26 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun directPrintForm1(context: Context) {
+        try {
+            val state = uiState.value
+            val html = PrintExportHelper.generateForm1DiaryHtml(
+                officer = state.activeOfficer,
+                monthYear = state.selectedMonthYear,
+                entries = state.tourEntries
+            )
+            PrintExportHelper.printHtmlDocument(
+                context = context,
+                htmlContent = html,
+                jobName = "Tour_Diary_${state.selectedMonthYear}"
+            )
+            _feedbackMessage.value = if (state.isTamil) "படிவம் 1 அச்சு அனுப்பப்பட்டது" else "Form 1 sent to printer"
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            _feedbackMessage.value = "Print error: ${e.localizedMessage}"
+        }
+    }
+
     fun printForm2TaBill(context: Context) {
         try {
             val state = uiState.value
@@ -412,6 +432,26 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
         } catch (e: Throwable) {
             e.printStackTrace()
             _feedbackMessage.value = if (uiState.value.isTamil) "PDF ஏற்றுமதி பிழை: ${e.localizedMessage}" else "PDF export error: ${e.localizedMessage}"
+        }
+    }
+
+    fun directPrintForm2(context: Context) {
+        try {
+            val state = uiState.value
+            val html = PrintExportHelper.generateForm2TaBillHtml(
+                officer = state.activeOfficer,
+                monthYear = state.selectedMonthYear,
+                entries = state.tourEntries
+            )
+            PrintExportHelper.printHtmlDocument(
+                context = context,
+                htmlContent = html,
+                jobName = "TA_Bill_${state.selectedMonthYear}"
+            )
+            _feedbackMessage.value = if (state.isTamil) "படிவம் 2 அச்சு அனுப்பப்பட்டது" else "Form 2 sent to printer"
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            _feedbackMessage.value = "Print error: ${e.localizedMessage}"
         }
     }
 

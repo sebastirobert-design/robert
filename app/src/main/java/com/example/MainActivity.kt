@@ -28,7 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -37,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.AppHeader
+import com.example.ui.components.PrintOptionsDialog
 import com.example.ui.screens.Form1DiaryScreen
 import com.example.ui.screens.Form2TaBillScreen
 import com.example.ui.screens.HomeScreen
@@ -51,6 +54,7 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.Navy700
 import com.example.ui.theme.Navy900
 import com.example.ui.viewmodel.TaBillViewModel
+import com.example.util.DateUtils
 
 class MainActivity : ComponentActivity() {
 
@@ -72,6 +76,7 @@ fun TaBillApp(viewModel: TaBillViewModel) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showPrintDialog by remember { mutableStateOf(false) }
 
     // Show feedback messages as snackbar
     LaunchedEffect(uiState.userFeedbackMessage) {
@@ -94,15 +99,7 @@ fun TaBillApp(viewModel: TaBillViewModel) {
                 onResetToToday = { viewModel.resetToToday() },
                 onToggleLanguage = { viewModel.toggleLanguage() },
                 onPrint = {
-                    try {
-                        if (uiState.activeTab == 1) {
-                            viewModel.printForm1Diary(context)
-                        } else {
-                            viewModel.printForm2TaBill(context)
-                        }
-                    } catch (e: Throwable) {
-                        e.printStackTrace()
-                    }
+                    showPrintDialog = true
                 },
                 onShare = { viewModel.shareOnWhatsApp(context) },
                 onOfficerClick = {
@@ -302,6 +299,40 @@ fun TaBillApp(viewModel: TaBillViewModel) {
             onDismiss = { viewModel.closeQuickNonTravelDialog() },
             isTamil = isTa,
             initialDay = uiState.selectedDayOfMonth
+        )
+    }
+
+    // Modal Print & Export Reports Dialog (படிவம் 1 & படிவம் 2 தேர்வு)
+    if (showPrintDialog) {
+        val monthDisplay = DateUtils.getTamilMonthDisplay(uiState.selectedMonthYear)
+        PrintOptionsDialog(
+            uiState = uiState,
+            monthDisplay = monthDisplay,
+            onDismiss = { showPrintDialog = false },
+            onViewForm1 = {
+                showPrintDialog = false
+                viewModel.setActiveTab(1)
+            },
+            onDirectPrintForm1 = {
+                showPrintDialog = false
+                viewModel.directPrintForm1(context)
+            },
+            onPdfExportForm1 = {
+                showPrintDialog = false
+                viewModel.printForm1Diary(context)
+            },
+            onViewForm2 = {
+                showPrintDialog = false
+                viewModel.setActiveTab(2)
+            },
+            onDirectPrintForm2 = {
+                showPrintDialog = false
+                viewModel.directPrintForm2(context)
+            },
+            onPdfExportForm2 = {
+                showPrintDialog = false
+                viewModel.printForm2TaBill(context)
+            }
         )
     }
 }
