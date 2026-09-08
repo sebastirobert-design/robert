@@ -265,93 +265,193 @@ object PrintExportHelper {
                         <tr>
                             <th colspan="9" style="background:#ddd;">PARTICULARS OF JOURNEY AND HALTS</th>
                             <th colspan="3">RAILWAY / STEAMER</th>
-                            <th rowspan="2">Bus<br>Fare</th>
-                            <th colspan="2">Distance travelled by road</th>
-                            <th colspan="3">DAILY ALLOWANCE</th>
-                            <th colspan="2">Terminal charges</th>
-                            <th rowspan="2">Inci-<br>dendal</th>
+                            <th colspan="2">ROAD & BUS</th>
+                            <th colspan="2">DAILY ALLOWANCE</th>
+                            <th colspan="2">TERMINAL CHARGES</th>
+                            <th rowspan="2">Inci-<br>dental</th>
                             <th rowspan="2" style="background:#ffe082;">Grand<br>Total</th>
-                            <th rowspan="2">Remark</th>
+                            <th rowspan="2">Remarks</th>
                         </tr>
                         <tr>
                             <!-- 1 to 3 Departure -->
-                            <th>Station</th><th>Date</th><th>Hour</th>
+                            <th>1. Dep. Station</th><th>2. Dep. Date</th><th>3. Dep. Hour</th>
                             <!-- 4 to 6 Arrival -->
-                            <th>Station</th><th>Date</th><th>Hour</th>
-                            <!-- 7, 8, 9 -->
-                            <th>Purpose of Journey</th>
-                            <th>Kind of<br>Journey</th>
-                            <th>No. of<br>km</th>
-                            <!-- 10, 11, 12 Rail -->
-                            <th>Class</th><th>No. of<br>fares</th><th>Amount</th>
-                            <!-- 14, 15 Road -->
-                            <th>At ord.<br>rates</th><th>At spec.<br>rates</th>
-                            <!-- 16A, 16B, 16C DA -->
-                            <th>No. of<br>days</th><th>Rate</th><th>Amount</th>
+                            <th>4. Arr. Station</th><th>5. Arr. Date</th><th>6. Arr. Hour</th>
+                            <!-- 7, 8 -->
+                            <th>7. Purpose of Journey</th>
+                            <th>8. Kind of Journey</th>
+                            <!-- 9, 10, 11 Rail -->
+                            <th>9. Class</th><th>10. No. of fares</th><th>11. Amount</th>
+                            <!-- 12, 13, 14 Road & Bus -->
+                            <th>12. Road Dist</th><th>13. Rate</th><th>14. Bus Fare</th>
+                            <!-- 15, 16 DA -->
+                            <th>15. DA Rate</th><th>16. DA Amount</th>
                             <!-- 17a, 17b -->
-                            <th>17a</th><th>17b</th>
+                            <th>17(a)</th><th>17(b)</th>
                         </tr>
                         <tr class="num-row">
                             <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th>
-                            <th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16A</th><th>16B</th><th>16C</th><th>17a</th><th>17b</th><th>18</th><th>19</th><th>20</th>
+                            <th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17(a)</th><th>17(b)</th><th>18</th><th>19</th><th>20</th>
                         </tr>
                     </thead>
                     <tbody>
         """.trimIndent())
 
-        for (entry in travelEntries) {
-            val dateShortDep = entry.departureDate.replace("2026", "26").replace("2022", "22")
-            val dateShortArr = entry.arrivalDate.replace("2026", "26").replace("2022", "22")
-            val busFareStr = if (entry.busFare > 0) String.format("%.0f", entry.busFare) else ""
-            val daRateStr = if (entry.daRate > 0) String.format("%.0f", entry.daRate) else ""
-            val daAmountStr = if (entry.daAmount > 0) String.format("%.0f", entry.daAmount) else ""
-            val t17aStr = if (entry.terminalCharge17a > 0) String.format("%.0f", entry.terminalCharge17a) else ""
-            val t17bStr = if (entry.terminalCharge17b > 0) String.format("%.0f", entry.terminalCharge17b) else ""
-            val grandTotalStr = if (entry.grandTotal > 0) String.format("%.0f", entry.grandTotal) else ""
+        val mainTours = if (entries.any { it.isReturnLeg }) {
+            entries.filter { !it.isReturnLeg }
+        } else {
+            entries
+        }
+
+        var htmlTotalKm = 0
+        var htmlTotalBusFare = 0.0
+        var htmlTotalDaAmount = 0.0
+        var htmlTotalTerminal17a = 0.0
+        var htmlTotalTerminal17b = 0.0
+        var htmlTotalIncidental = 0.0
+        var htmlGrandTotal = 0.0
+
+        for (tour in mainTours) {
+            val depStation = tour.departureStation.ifEmpty { "தலைமையிடம்" }
+            val depDate = tour.departureDate
+            val depHour = if (tour.isNonTravel) "" else tour.departureHour.ifEmpty { "08:00 AM" }
+            val arrStation = tour.arrivalStation.ifEmpty { "தலைமையிடம்" }
+            val arrDate = tour.arrivalDate.ifEmpty { tour.departureDate }
+            val arrHour = if (tour.isNonTravel) "" else tour.arrivalHour.ifEmpty { "09:00 AM" }
+            val purpose = if (tour.isNonTravel) {
+                tour.purposeOfJourney.ifEmpty { tour.nonTravelType }
+            } else {
+                tour.purposeOfJourney
+            }
+            val mode = if (tour.isNonTravel) "" else tour.kindOfJourney.ifEmpty { "பேருந்து" }
+            val railClass = tour.railClass
+            val noOfFares = tour.railNoOfFares
+            val railAmount = if (tour.railAmount > 0) String.format(Locale.US, "%.0f", tour.railAmount) else ""
+            val distance = if (tour.isNonTravel || tour.distanceKm <= 0) "" else "${tour.distanceKm}"
+            val rate = ""
+            val fare = if (tour.isNonTravel || tour.busFare <= 0.0) "" else String.format(Locale.US, "%.0f", tour.busFare)
+            val daRate = if (tour.isNonTravel || tour.daRate <= 0.0) "" else String.format(Locale.US, "%.0f", tour.daRate)
+            val daAmount = if (tour.isNonTravel || tour.daAmount <= 0.0) "" else String.format(Locale.US, "%.0f", tour.daAmount)
+            val terminalA = if (tour.isNonTravel || tour.terminalCharge17a <= 0.0) "" else String.format(Locale.US, "%.0f", tour.terminalCharge17a)
+            val terminalB = if (tour.isNonTravel || tour.terminalCharge17b <= 0.0) "" else String.format(Locale.US, "%.0f", tour.terminalCharge17b)
+            val incid = if (tour.isNonTravel || tour.incidentalCharges <= 0.0) "0" else String.format(Locale.US, "%.0f", tour.incidentalCharges)
+            val total = if (tour.isNonTravel || tour.grandTotal <= 0.0) "" else String.format(Locale.US, "%.0f", tour.grandTotal)
+            val remarks = if (tour.remarks.isNotBlank()) tour.remarks else if (tour.isNonTravel) tour.nonTravelType else ""
 
             sb.append("""
                 <tr>
-                    <td class="col-left">${entry.departureStation}</td>
-                    <td>$dateShortDep</td>
-                    <td>${entry.departureHour}</td>
-                    <td class="col-left">${entry.arrivalStation}</td>
-                    <td>$dateShortArr</td>
-                    <td>${entry.arrivalHour}</td>
-                    <td class="col-left">${entry.purposeOfJourney}</td>
-                    <td>${entry.kindOfJourney}</td>
-                    <td>${if (entry.distanceKm > 0) entry.distanceKm else ""}</td>
-                    <td>${entry.railClass}</td>
-                    <td>${entry.railNoOfFares}</td>
-                    <td>${if (entry.railAmount > 0) String.format("%.0f", entry.railAmount) else ""}</td>
-                    <td>$busFareStr</td>
-                    <td>${entry.roadMileageOrdinary}</td>
-                    <td>${entry.roadMileageSpecial}</td>
-                    <td>${entry.daDays}</td>
-                    <td>$daRateStr</td>
-                    <td>$daAmountStr</td>
-                    <td>$t17aStr</td>
-                    <td>$t17bStr</td>
-                    <td>${if (entry.incidentalCharges > 0) String.format("%.0f", entry.incidentalCharges) else ""}</td>
-                    <td style="font-weight:bold; background:#fff9c4;">$grandTotalStr</td>
-                    <td>${entry.remarks}</td>
+                    <td class="col-left">$depStation</td>
+                    <td>$depDate</td>
+                    <td>$depHour</td>
+                    <td class="col-left">$arrStation</td>
+                    <td>$arrDate</td>
+                    <td>$arrHour</td>
+                    <td class="col-left">$purpose</td>
+                    <td>$mode</td>
+                    <td>$railClass</td>
+                    <td>$noOfFares</td>
+                    <td>$railAmount</td>
+                    <td>$distance</td>
+                    <td>$rate</td>
+                    <td>$fare</td>
+                    <td>$daRate</td>
+                    <td>$daAmount</td>
+                    <td>$terminalA</td>
+                    <td>$terminalB</td>
+                    <td>$incid</td>
+                    <td style="font-weight:bold; background:#fff9c4;">$total</td>
+                    <td>$remarks</td>
                 </tr>
             """.trimIndent())
+
+            if (!tour.isNonTravel) {
+                htmlTotalKm += tour.distanceKm
+                htmlTotalBusFare += tour.busFare
+                htmlTotalDaAmount += tour.daAmount
+                htmlTotalTerminal17a += tour.terminalCharge17a
+                htmlTotalTerminal17b += tour.terminalCharge17b
+                htmlTotalIncidental += tour.incidentalCharges
+                htmlGrandTotal += tour.grandTotal
+
+                // Return Trip
+                val isHoliday = tour.nonTravelType.contains("விடுமுறை") || tour.nonTravelType.contains("Holiday") ||
+                    tour.nonTravelType.contains("தற்செயல்") || tour.nonTravelType.contains("CL") ||
+                    tour.purposeOfJourney.contains("CL") || tour.purposeOfJourney.contains("விடுமுறை")
+                val isOfficeWork = tour.nonTravelType.contains("அலுவலக") || tour.nonTravelType.contains("Office") ||
+                    tour.purposeOfJourney.contains("அலுவலக")
+
+                if (!isHoliday && !isOfficeWork) {
+                    val pairedReturn = entries.find {
+                        it.isReturnLeg && ((it.tripGroupId.isNotBlank() && it.tripGroupId == tour.tripGroupId) || (it.dayOfMonth == tour.dayOfMonth))
+                    }
+                    val returnDepStation = pairedReturn?.departureStation?.ifEmpty { arrStation } ?: arrStation
+                    val returnDepHour = pairedReturn?.departureHour?.ifEmpty { "04:10 PM" } ?: "04:10 PM"
+                    val returnArrStation = pairedReturn?.arrivalStation?.ifEmpty { depStation } ?: depStation
+                    val returnArrHour = pairedReturn?.arrivalHour?.ifEmpty { "05:00 PM" } ?: "05:00 PM"
+
+                    val returnFareVal = if (pairedReturn != null && pairedReturn.busFare > 0) pairedReturn.busFare else tour.busFare
+                    val returnFare = if (returnFareVal > 0.0) String.format(Locale.US, "%.0f", returnFareVal) else ""
+
+                    val termAVal = if (pairedReturn != null && pairedReturn.terminalCharge17a > 0) pairedReturn.terminalCharge17a else (if (tour.terminalCharge17a > 0) tour.terminalCharge17a else 20.0)
+                    val termA = String.format(Locale.US, "%.0f", termAVal)
+
+                    val termBVal = if (pairedReturn != null && pairedReturn.terminalCharge17b > 0) pairedReturn.terminalCharge17b else (if (tour.terminalCharge17b > 0) tour.terminalCharge17b else 20.0)
+                    val termB = String.format(Locale.US, "%.0f", termBVal)
+
+                    val fareNum = returnFare.toDoubleOrNull() ?: 0.0
+                    val termANum = termA.toDoubleOrNull() ?: 20.0
+                    val termBNum = termB.toDoubleOrNull() ?: 20.0
+                    val returnTotalVal = fareNum + termANum + termBNum
+                    val returnTotal = if (returnTotalVal > 0.0) String.format(Locale.US, "%.0f", returnTotalVal) else ""
+
+                    sb.append("""
+                        <tr>
+                            <td class="col-left">$returnDepStation</td>
+                            <td>$depDate</td>
+                            <td>$returnDepHour</td>
+                            <td class="col-left">$returnArrStation</td>
+                            <td>$depDate</td>
+                            <td>$returnArrHour</td>
+                            <td class="col-left"></td>
+                            <td>$mode</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td>$distance</td>
+                            <td></td>
+                            <td>$returnFare</td>
+                            <td></td>
+                            <td>0</td>
+                            <td>$termA</td>
+                            <td>$termB</td>
+                            <td>0</td>
+                            <td style="font-weight:bold; background:#fff9c4;">$returnTotal</td>
+                            <td></td>
+                        </tr>
+                    """.trimIndent())
+
+                    htmlTotalKm += tour.distanceKm
+                    htmlTotalBusFare += fareNum
+                    htmlTotalTerminal17a += termANum
+                    htmlTotalTerminal17b += termBNum
+                    htmlGrandTotal += returnTotalVal
+                }
+            }
         }
 
         // Totals Row
         sb.append("""
                 <tr class="total-row">
-                    <td colspan="8" style="text-align: right; padding-right: 10px;"><b>TOTAL</b></td>
-                    <td><b>$totalKm</b></td>
-                    <td colspan="3"></td>
-                    <td><b>${String.format("%.0f", totalBusFare)}</b></td>
-                    <td colspan="2"></td>
-                    <td colspan="2"></td>
-                    <td><b>${String.format("%.0f", totalDaAmount)}</b></td>
-                    <td><b>${String.format("%.0f", totalTerminal17a)}</b></td>
-                    <td><b>${String.format("%.0f", totalTerminal17b)}</b></td>
-                    <td><b>${String.format("%.0f", totalIncidental)}</b></td>
-                    <td style="background:#ffeb3b; font-size:10px;"><b>₹${String.format("%.0f", grandTotal)}</b></td>
+                    <td colspan="11" style="text-align: right; padding-right: 10px;"><b>TOTAL</b></td>
+                    <td><b>$htmlTotalKm</b></td>
+                    <td></td>
+                    <td><b>${String.format(Locale.US, "%.0f", htmlTotalBusFare)}</b></td>
+                    <td></td>
+                    <td><b>${String.format(Locale.US, "%.0f", htmlTotalDaAmount)}</b></td>
+                    <td><b>${String.format(Locale.US, "%.0f", htmlTotalTerminal17a)}</b></td>
+                    <td><b>${String.format(Locale.US, "%.0f", htmlTotalTerminal17b)}</b></td>
+                    <td><b>${String.format(Locale.US, "%.0f", htmlTotalIncidental)}</b></td>
+                    <td style="background:#ffeb3b; font-size:10px;"><b>₹${String.format(Locale.US, "%.0f", htmlGrandTotal)}</b></td>
                     <td></td>
                 </tr>
             </tbody>
@@ -673,11 +773,21 @@ object PrintExportHelper {
 
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
-            textSize = 7.5f
+            textSize = 6.2f
         }
         val boldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
-            textSize = 8f
+            textSize = 6.2f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val headerTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 5.6f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val headerNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.DKGRAY
+            textSize = 5.8f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -686,7 +796,11 @@ object PrintExportHelper {
             style = Paint.Style.STROKE
         }
         val headerBgPaint = Paint().apply {
-            color = Color.parseColor("#EEEEEE")
+            color = Color.parseColor("#ECEFF1")
+            style = Paint.Style.FILL
+        }
+        val numBgPaint = Paint().apply {
+            color = Color.parseColor("#CFD8DC")
             style = Paint.Style.FILL
         }
         val totalBgPaint = Paint().apply {
@@ -694,95 +808,254 @@ object PrintExportHelper {
             style = Paint.Style.FILL
         }
 
-        val leftMargin = 30f
-        val colWidths = floatArrayOf(95f, 55f, 38f, 95f, 55f, 38f, 38f, 44f, 44f, 42f, 42f, 44f, 62f, 90f)
+        fun fitText(text: String, maxWidth: Float, paint: Paint): String {
+            if (paint.measureText(text) <= maxWidth) return text
+            var truncated = text
+            while (truncated.isNotEmpty() && paint.measureText(truncated + "…") > maxWidth) {
+                truncated = truncated.dropLast(1)
+            }
+            return if (truncated.isEmpty()) "" else truncated + "…"
+        }
+
+        val leftMargin = 19.5f
+        val colWidths = floatArrayOf(
+            58f, // 1. Dep. Station
+            44f, // 2. Dep. Date
+            38f, // 3. Dep. Hour
+            58f, // 4. Arr. Station
+            44f, // 5. Arr. Date
+            38f, // 6. Arr. Hour
+            66f, // 7. Purpose of Journey
+            38f, // 8. Kind of Journey
+            25f, // 9. Class
+            25f, // 10. No. of Fares
+            28f, // 11. Amount
+            28f, // 12. Road Distance (km)
+            24f, // 13. Rate
+            33f, // 14. Bus Fare
+            33f, // 15. DA Rate
+            36f, // 16. DA Amount
+            32f, // 17(a). Terminal Charges
+            32f, // 17(b). Terminal Charges
+            27f, // 18. Incidental Charges
+            42f, // 19. TOTAL
+            52f  // 20. Remarks
+        )
         val totalTableWidth = colWidths.sum()
 
-        val travelEntries = entries.filter { !it.isNonTravel }
-        val totalKm = travelEntries.sumOf { it.distanceKm }
-        val totalBusFare = travelEntries.sumOf { it.busFare }
-        val totalDaAmount = travelEntries.sumOf { it.daAmount }
-        val totalTerminal17a = travelEntries.sumOf { it.terminalCharge17a }
-        val totalTerminal17b = travelEntries.sumOf { it.terminalCharge17b }
-        val totalIncidental = travelEntries.sumOf { it.incidentalCharges }
-        val grandTotal = travelEntries.sumOf { it.grandTotal }
+        val headerTitles = arrayOf(
+            "Dep. Station", "Dep. Date", "Dep. Hour",
+            "Arr. Station", "Arr. Date", "Arr. Hour",
+            "Purpose of Journey", "Kind",
+            "Class", "No. fares", "Amount",
+            "Road Dist", "Rate", "Bus Fare",
+            "DA Rate", "DA Amount",
+            "17(a) Term", "17(b) Term", "Incid.",
+            "TOTAL", "Remarks"
+        )
+        val headerNumbers = arrayOf(
+            "1", "2", "3",
+            "4", "5", "6",
+            "7", "8",
+            "9", "10", "11",
+            "12", "13", "14",
+            "15", "16",
+            "17(a)", "17(b)", "18",
+            "19", "20"
+        )
 
         fun drawHeader(canvas: Canvas, currentY: Float): Float {
             var y = currentY
             val monthBillHeader = DateUtils.getBillMonthHeader(monthYear)
             val englishMonth = DateUtils.getEnglishMonthDisplay(monthYear)
-            val basicPayFormatted = String.format("%.0f", officer.basicPay)
+            val basicPayFormatted = String.format(Locale.US, "%.0f", officer.basicPay)
 
             canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + 24f, linePaint)
             canvas.drawText(
                 "Travelling Allowance Bill of the $englishMonth ($monthBillHeader) Establishment of ${officer.designation} ${officer.headquarters}",
                 leftMargin + 6f,
-                y + 11f,
+                y + 10f,
                 boldPaint
             )
-            canvas.drawText("BASIC PAY - Rs: $basicPayFormatted", leftMargin + totalTableWidth - 130f, y + 11f, boldPaint)
-            canvas.drawText("Name: ${officer.name} | HQ: ${officer.headquarters} | Sivagangai District", leftMargin + 6f, y + 20f, textPaint)
+            canvas.drawText("BASIC PAY - Rs: $basicPayFormatted", leftMargin + totalTableWidth - 140f, y + 10f, boldPaint)
+            canvas.drawText("Travelling allowance Bill of ${officer.name}, ${officer.shortDesignation}, ${officer.headquarters} | Sivagangai Dt", leftMargin + 6f, y + 19f, textPaint)
             y += 28f
 
-            val hHeight = 32f
-            canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + hHeight, headerBgPaint)
-            canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + hHeight, linePaint)
+            val hHeight1 = 15f
+            val hHeight2 = 12f
+            val totalHHeight = hHeight1 + hHeight2
 
-            val headers = arrayOf(
-                "Dep. Station", "Date", "Hour",
-                "Arr. Station", "Date", "Hour",
-                "km", "Fare", "D.A.", "17(a)", "17(b)", "Incid.", "TOTAL", "Purpose / Remarks"
-            )
+            canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + hHeight1, headerBgPaint)
+            canvas.drawRect(leftMargin, y + hHeight1, leftMargin + totalTableWidth, y + totalHHeight, numBgPaint)
+            canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + totalHHeight, linePaint)
+            canvas.drawLine(leftMargin, y + hHeight1, leftMargin + totalTableWidth, y + hHeight1, linePaint)
+
             var curX = leftMargin
-            for (i in headers.indices) {
-                canvas.drawLine(curX, y, curX, y + hHeight, linePaint)
-                canvas.drawText(headers[i], curX + 2f, y + 18f, boldPaint)
+            for (i in headerTitles.indices) {
+                canvas.drawLine(curX, y, curX, y + totalHHeight, linePaint)
+                val title = fitText(headerTitles[i], colWidths[i] - 2f, headerTitlePaint)
+                canvas.drawText(title, curX + 1.5f, y + 10.5f, headerTitlePaint)
+
+                val numStr = headerNumbers[i]
+                val numW = headerNumPaint.measureText(numStr)
+                val numX = curX + (colWidths[i] - numW) / 2f
+                canvas.drawText(numStr, numX, y + hHeight1 + 9f, headerNumPaint)
+
                 curX += colWidths[i]
             }
-            canvas.drawLine(curX, y, curX, y + hHeight, linePaint)
+            canvas.drawLine(curX, y, curX, y + totalHHeight, linePaint)
 
-            return y + hHeight
+            return y + totalHHeight
         }
 
-        var y = drawHeader(canvas, 24f)
-        val rowHeight = 15f
+        val mainTours = if (entries.any { it.isReturnLeg }) {
+            entries.filter { !it.isReturnLeg }
+        } else {
+            entries
+        }
 
-        for (entry in travelEntries) {
-            if (y + rowHeight > pageHeight - 85f) {
+        class Form2PdfRow(
+            val values: Array<String>
+        )
+
+        val rowsToDraw = mutableListOf<Form2PdfRow>()
+        var pdfTotalKm = 0
+        var pdfTotalBusFare = 0.0
+        var pdfTotalDaAmount = 0.0
+        var pdfTotalTerminal17a = 0.0
+        var pdfTotalTerminal17b = 0.0
+        var pdfTotalIncidental = 0.0
+        var pdfGrandTotal = 0.0
+
+        for (tour in mainTours) {
+            val depStation = tour.departureStation.ifEmpty { "தலைமையிடம்" }
+            val depDate = tour.departureDate
+            val depHour = if (tour.isNonTravel) "" else tour.departureHour.ifEmpty { "08:00 AM" }
+            val arrStation = tour.arrivalStation.ifEmpty { "தலைமையிடம்" }
+            val arrDate = tour.arrivalDate.ifEmpty { tour.departureDate }
+            val arrHour = if (tour.isNonTravel) "" else tour.arrivalHour.ifEmpty { "09:00 AM" }
+            val purpose = if (tour.isNonTravel) {
+                tour.purposeOfJourney.ifEmpty { tour.nonTravelType }
+            } else {
+                tour.purposeOfJourney
+            }
+            val mode = if (tour.isNonTravel) "" else tour.kindOfJourney.ifEmpty { "பேருந்து" }
+            val railClass = tour.railClass
+            val noOfFares = tour.railNoOfFares
+            val railAmount = if (tour.railAmount > 0) String.format(Locale.US, "%.0f", tour.railAmount) else ""
+            val distance = if (tour.isNonTravel || tour.distanceKm <= 0) "" else "${tour.distanceKm}"
+            val rate = ""
+            val fare = if (tour.isNonTravel || tour.busFare <= 0.0) "" else String.format(Locale.US, "%.0f", tour.busFare)
+            val daRate = if (tour.isNonTravel || tour.daRate <= 0.0) "" else String.format(Locale.US, "%.0f", tour.daRate)
+            val daAmount = if (tour.isNonTravel || tour.daAmount <= 0.0) "" else String.format(Locale.US, "%.0f", tour.daAmount)
+            val terminalA = if (tour.isNonTravel || tour.terminalCharge17a <= 0.0) "" else String.format(Locale.US, "%.0f", tour.terminalCharge17a)
+            val terminalB = if (tour.isNonTravel || tour.terminalCharge17b <= 0.0) "" else String.format(Locale.US, "%.0f", tour.terminalCharge17b)
+            val incid = if (tour.isNonTravel || tour.incidentalCharges <= 0.0) "0" else String.format(Locale.US, "%.0f", tour.incidentalCharges)
+            val total = if (tour.isNonTravel || tour.grandTotal <= 0.0) "" else String.format(Locale.US, "%.0f", tour.grandTotal)
+            val remarks = if (tour.remarks.isNotBlank()) tour.remarks else if (tour.isNonTravel) tour.nonTravelType else ""
+
+            // Outbound row
+            rowsToDraw.add(
+                Form2PdfRow(
+                    arrayOf(
+                        depStation, depDate, depHour,
+                        arrStation, arrDate, arrHour,
+                        purpose, mode,
+                        railClass, noOfFares, railAmount,
+                        distance, rate, fare,
+                        daRate, daAmount,
+                        terminalA, terminalB, incid,
+                        total, remarks
+                    )
+                )
+            )
+
+            if (!tour.isNonTravel) {
+                pdfTotalKm += tour.distanceKm
+                pdfTotalBusFare += tour.busFare
+                pdfTotalDaAmount += tour.daAmount
+                pdfTotalTerminal17a += tour.terminalCharge17a
+                pdfTotalTerminal17b += tour.terminalCharge17b
+                pdfTotalIncidental += tour.incidentalCharges
+                pdfGrandTotal += tour.grandTotal
+
+                val isHoliday = tour.nonTravelType.contains("விடுமுறை") || tour.nonTravelType.contains("Holiday") ||
+                    tour.nonTravelType.contains("தற்செயல்") || tour.nonTravelType.contains("CL") ||
+                    tour.purposeOfJourney.contains("CL") || tour.purposeOfJourney.contains("விடுமுறை")
+                val isOfficeWork = tour.nonTravelType.contains("அலுவலக") || tour.nonTravelType.contains("Office") ||
+                    tour.purposeOfJourney.contains("அலுவலக")
+
+                if (!isHoliday && !isOfficeWork) {
+                    val pairedReturn = entries.find {
+                        it.isReturnLeg && ((it.tripGroupId.isNotBlank() && it.tripGroupId == tour.tripGroupId) || (it.dayOfMonth == tour.dayOfMonth))
+                    }
+                    val returnDepStation = pairedReturn?.departureStation?.ifEmpty { arrStation } ?: arrStation
+                    val returnDepHour = pairedReturn?.departureHour?.ifEmpty { "04:10 PM" } ?: "04:10 PM"
+                    val returnArrStation = pairedReturn?.arrivalStation?.ifEmpty { depStation } ?: depStation
+                    val returnArrHour = pairedReturn?.arrivalHour?.ifEmpty { "05:00 PM" } ?: "05:00 PM"
+
+                    val returnFareVal = if (pairedReturn != null && pairedReturn.busFare > 0) pairedReturn.busFare else tour.busFare
+                    val returnFare = if (returnFareVal > 0.0) String.format(Locale.US, "%.0f", returnFareVal) else ""
+
+                    val termAVal = if (pairedReturn != null && pairedReturn.terminalCharge17a > 0) pairedReturn.terminalCharge17a else (if (tour.terminalCharge17a > 0) tour.terminalCharge17a else 20.0)
+                    val termA = String.format(Locale.US, "%.0f", termAVal)
+
+                    val termBVal = if (pairedReturn != null && pairedReturn.terminalCharge17b > 0) pairedReturn.terminalCharge17b else (if (tour.terminalCharge17b > 0) tour.terminalCharge17b else 20.0)
+                    val termB = String.format(Locale.US, "%.0f", termBVal)
+
+                    val fareNum = returnFare.toDoubleOrNull() ?: 0.0
+                    val termANum = termA.toDoubleOrNull() ?: 20.0
+                    val termBNum = termB.toDoubleOrNull() ?: 20.0
+                    val returnTotalVal = fareNum + termANum + termBNum
+                    val returnTotal = if (returnTotalVal > 0.0) String.format(Locale.US, "%.0f", returnTotalVal) else ""
+
+                    // Return row
+                    rowsToDraw.add(
+                        Form2PdfRow(
+                            arrayOf(
+                                returnDepStation, depDate, returnDepHour,
+                                returnArrStation, depDate, returnArrHour,
+                                "", mode,
+                                "", "", "",
+                                distance, "", returnFare,
+                                "", "0",
+                                termA, termB, "0",
+                                returnTotal, ""
+                            )
+                        )
+                    )
+
+                    pdfTotalKm += tour.distanceKm
+                    pdfTotalBusFare += fareNum
+                    pdfTotalTerminal17a += termANum
+                    pdfTotalTerminal17b += termBNum
+                    pdfGrandTotal += returnTotalVal
+                }
+            }
+        }
+
+        var y = drawHeader(canvas, 20f)
+        val rowHeight = 14f
+
+        for (row in rowsToDraw) {
+            if (y + rowHeight > pageHeight - 75f) {
                 pdfDocument.finishPage(page)
                 pageNumber++
                 pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
                 page = pdfDocument.startPage(pageInfo)
                 canvas = page.canvas
-                y = drawHeader(canvas, 24f)
+                y = drawHeader(canvas, 20f)
             }
 
             canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + rowHeight, linePaint)
 
-            val rowVals = arrayOf(
-                entry.departureStation,
-                entry.departureDate,
-                entry.departureHour,
-                entry.arrivalStation,
-                entry.arrivalDate,
-                entry.arrivalHour,
-                if (entry.distanceKm > 0) "${entry.distanceKm}" else "",
-                String.format("%.0f", entry.busFare),
-                String.format("%.0f", entry.daAmount),
-                String.format("%.0f", entry.terminalCharge17a),
-                String.format("%.0f", entry.terminalCharge17b),
-                String.format("%.0f", entry.incidentalCharges),
-                String.format("%.0f", entry.grandTotal),
-                entry.purposeOfJourney
-            )
-
             var curX = leftMargin
-            for (i in rowVals.indices) {
+            for (i in row.values.indices) {
                 canvas.drawLine(curX, y, curX, y + rowHeight, linePaint)
-                val v = rowVals[i]
-                val maxLen = (colWidths[i] / 4.8f).toInt()
-                val printV = if (v.length > maxLen) v.take(maxLen - 2) + ".." else v
-                canvas.drawText(printV, curX + 2f, y + 10.5f, textPaint)
+                val v = row.values[i]
+                val isTotalCell = (i == 19)
+                val printV = fitText(v, colWidths[i] - 2f, if (isTotalCell) boldPaint else textPaint)
+                canvas.drawText(printV, curX + 1.5f, y + 10f, if (isTotalCell) boldPaint else textPaint)
                 curX += colWidths[i]
             }
             canvas.drawLine(curX, y, curX, y + rowHeight, linePaint)
@@ -790,34 +1063,49 @@ object PrintExportHelper {
             y += rowHeight
         }
 
+        if (y + rowHeight > pageHeight - 75f) {
+            pdfDocument.finishPage(page)
+            pageNumber++
+            pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+            page = pdfDocument.startPage(pageInfo)
+            canvas = page.canvas
+            y = drawHeader(canvas, 20f)
+        }
+
         canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + rowHeight, totalBgPaint)
         canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + rowHeight, linePaint)
 
         val totVals = arrayOf(
-            "TOTAL", "", "", "", "", "",
-            "$totalKm",
-            String.format("%.0f", totalBusFare),
-            String.format("%.0f", totalDaAmount),
-            String.format("%.0f", totalTerminal17a),
-            String.format("%.0f", totalTerminal17b),
-            String.format("%.0f", totalIncidental),
-            "₹" + String.format("%.0f", grandTotal),
+            "TOTAL", "", "",
+            "", "", "",
+            "", "",
+            "", "", "",
+            "$pdfTotalKm",
+            "",
+            String.format(Locale.US, "%.0f", pdfTotalBusFare),
+            "",
+            String.format(Locale.US, "%.0f", pdfTotalDaAmount),
+            String.format(Locale.US, "%.0f", pdfTotalTerminal17a),
+            String.format(Locale.US, "%.0f", pdfTotalTerminal17b),
+            String.format(Locale.US, "%.0f", pdfTotalIncidental),
+            "₹" + String.format(Locale.US, "%.0f", pdfGrandTotal),
             ""
         )
         var curX = leftMargin
         for (i in totVals.indices) {
             canvas.drawLine(curX, y, curX, y + rowHeight, linePaint)
-            canvas.drawText(totVals[i], curX + 2f, y + 10.5f, boldPaint)
+            val printV = fitText(totVals[i], colWidths[i] - 2f, boldPaint)
+            canvas.drawText(printV, curX + 1.5f, y + 10f, boldPaint)
             curX += colWidths[i]
         }
         canvas.drawLine(curX, y, curX, y + rowHeight, linePaint)
-        y += rowHeight + 14f
+        y += rowHeight + 12f
 
-        canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + 42f, linePaint)
+        canvas.drawRect(leftMargin, y, leftMargin + totalTableWidth, y + 40f, linePaint)
         canvas.drawText("CERTIFICATE: Certified that the journeys were performed solely on official government duty for public service.", leftMargin + 6f, y + 12f, textPaint)
-        canvas.drawText("Passed for Payment: Rs. ${String.format("%.0f", grandTotal)}/-", leftMargin + 6f, y + 26f, boldPaint)
-        canvas.drawText("Station: ${officer.headquarters} | Date: _________", leftMargin + 6f, y + 36f, textPaint)
-        canvas.drawText("${officer.name} (${officer.designation})", leftMargin + totalTableWidth - 180f, y + 36f, boldPaint)
+        canvas.drawText("Passed for Payment: Rs. ${String.format(Locale.US, "%.0f", pdfGrandTotal)}/-", leftMargin + 6f, y + 25f, boldPaint)
+        canvas.drawText("Station: ${officer.headquarters} | Date: _________", leftMargin + 6f, y + 35f, textPaint)
+        canvas.drawText("${officer.name} (${officer.designation})", leftMargin + totalTableWidth - 190f, y + 35f, boldPaint)
 
         pdfDocument.finishPage(page)
 
