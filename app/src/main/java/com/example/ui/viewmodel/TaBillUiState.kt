@@ -36,7 +36,7 @@ data class TaBillUiState(
         get() = com.example.util.DateUtils.getEnglishMonthDisplay(selectedMonthYear)
 
     val travelEntries: List<TourEntry>
-        get() = tourEntries.filter { !it.isNonTravel }
+        get() = tourEntries.filter { it.isTaEligible }
 
     val totalKm: Int
         get() = travelEntries.sumOf { it.distanceKm }

@@ -78,4 +78,34 @@ data class TourEntry(
     fun calculatedGrandTotal(): Double {
         return busFare + railAmount + daAmount + terminalCharge17a + terminalCharge17b + incidentalCharges
     }
+
+    /**
+     * Form 2 TA Calculation Eligibility:
+     * Excludes holiday (விடுமுறை), casual leave (தற்செயல் விடுப்பு), office duty (அலுவலகப் பணி),
+     * and includes ONLY entries where kind of journey (column 8) uses bus (பேருந்து) or train (இரயில்/ரயில்).
+     */
+    val isTaEligible: Boolean
+        get() {
+            if (isNonTravel) return false
+            val arr = arrivalStation.trim()
+            val dep = departureStation.trim()
+            val nonType = nonTravelType.trim()
+            val kind = kindOfJourney.trim()
+
+            val isExcludedKeyword = arr.contains("விடுமுறை") || arr.contains("Holiday", ignoreCase = true) ||
+                arr.contains("தற்செயல்") || arr.contains("CL", ignoreCase = true) ||
+                arr.contains("அலுவலக") || arr.contains("Office", ignoreCase = true) ||
+                dep.contains("விடுமுறை") || dep.contains("Holiday", ignoreCase = true) ||
+                dep.contains("தற்செயல்") || dep.contains("CL", ignoreCase = true) ||
+                dep.contains("சனிக்கிழமை") || dep.contains("ஞாயிற்றுக்கிழமை") ||
+                nonType.contains("விடுமுறை") || nonType.contains("தற்செயல்") || nonType.contains("அலுவலக")
+
+            if (isExcludedKeyword) return false
+
+            val isBusOrTrain = kind.contains("பேருந்து") || kind.contains("bus", ignoreCase = true) ||
+                kind.contains("இரயில்") || kind.contains("ரயில்") || kind.contains("train", ignoreCase = true) ||
+                kind.contains("rail", ignoreCase = true)
+
+            return isBusOrTrain && (distanceKm > 0 || busFare > 0.0 || railAmount > 0.0 || daAmount > 0.0 || terminalCharge17a > 0.0)
+        }
 }

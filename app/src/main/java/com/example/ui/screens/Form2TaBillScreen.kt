@@ -402,7 +402,7 @@ fun Form2TaBillScreen(
                                     DataCell(text = entry.arrivalStation, width = 130.dp, alignLeft = true)
                                     DataCell(text = dateShortArr, width = 65.dp)
                                     DataCell(text = entry.arrivalHour, width = 55.dp)
-                                    DataCell(text = entry.purposeOfJourney, width = 120.dp, alignLeft = true)
+                                    DataCell(text = if (entry.isReturnLeg) "" else entry.purposeOfJourney, width = 120.dp, alignLeft = true)
                                     DataCell(text = entry.kindOfJourney, width = 60.dp)
                                     DataCell(text = if (entry.distanceKm > 0) entry.distanceKm.toString() else "", width = 45.dp)
                                     DataCell(text = entry.railClass, width = 45.dp)
