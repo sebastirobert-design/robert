@@ -50,6 +50,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.fillMaxSize
 import com.example.data.model.School
 import com.example.ui.theme.BlueAccent
 import com.example.ui.theme.EmeraldGreen
@@ -74,8 +77,6 @@ fun SchoolPickerSheet(
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("ALL") }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
     val categories = listOf(
         "ALL" to if (isTamil) "அனைத்தும் (119)" else "All (119)",
         "PUPS" to if (isTamil) "தொடக்கப்பள்ளி (PUPS)" else "Primary (PUPS)",
@@ -97,17 +98,23 @@ fun SchoolPickerSheet(
         matchesCategory && matchesQuery
     }
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color.White,
-        modifier = modifier.fillMaxHeight(0.9f)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+        Card(
+            modifier = modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.92f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -327,4 +334,5 @@ fun SchoolPickerSheet(
             }
         }
     }
+}
 }

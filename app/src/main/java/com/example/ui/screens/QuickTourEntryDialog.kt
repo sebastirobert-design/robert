@@ -61,7 +61,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import java.util.Locale
 import com.example.ui.components.AppOutlinedTextField
 import androidx.compose.runtime.Composable
@@ -129,7 +134,6 @@ fun QuickTourEntryDialog(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val (year, month) = DateUtils.parseYearMonth(monthYear)
     val defaultDay = (editingEntry?.dayOfMonth ?: initialDay).coerceIn(1, 31)
 
@@ -137,6 +141,7 @@ fun QuickTourEntryDialog(
     var currentEditingEntry by remember(editingEntry) { mutableStateOf(editingEntry) }
     var isEditingMode by remember(editingEntry) { mutableStateOf(editingEntry != null) }
     var showAlreadyExistsConfirmDialog by remember { mutableStateOf(false) }
+    var showDiscardConfirmDialog by remember { mutableStateOf(false) }
 
     var dayOfMonth by remember { mutableIntStateOf(defaultDay) }
     var dayStr by remember { mutableStateOf(String.format(Locale.US, "%02d", defaultDay)) }
@@ -314,58 +319,92 @@ fun QuickTourEntryDialog(
         )
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color(0xFFF8F9FA),
-        modifier = modifier.fillMaxHeight(0.92f)
+    Dialog(
+        onDismissRequest = {
+            // Intentionally empty: The window must NOT disappear until the user presses Save Tour or confirms discard.
+        },
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
+        )
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .systemBarsPadding()
+                .imePadding(),
+            contentAlignment = Alignment.BottomCenter
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Card(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.96f)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { /* Absorb clicks to prevent background events */ },
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    // Visual pull handle bar
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Navy700),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DirectionsBus,
-                            contentDescription = "Tour Entry",
-                            tint = GoldAccent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = if (isTamil) "புதிய பயணப் பதிவு (Less-Input Tour)" else "Quick Tour Entry",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Navy900
-                        )
-                        Text(
-                            text = if (isTamil) "1 முறை உள்ளிட்டால் Form 1 & Form 2 தயாராகும்" else "Auto-generates Form 1 Diary & Form 2 TA Bill",
-                            fontSize = 11.5.sp,
-                            color = TextSecondary
-                        )
-                    }
-                }
+                            .align(Alignment.CenterHorizontally)
+                            .padding(top = 4.dp, bottom = 6.dp)
+                            .size(width = 38.dp, height = 4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color(0xFFD1D5DB))
+                    )
 
-                IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
-                }
-            }
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Navy700),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DirectionsBus,
+                                    contentDescription = "Tour Entry",
+                                    tint = GoldAccent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = if (isTamil) "புதிய பயணப் பதிவு (Less-Input Tour)" else "Quick Tour Entry",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Navy900
+                                )
+                                Text(
+                                    text = if (isTamil) "1 முறை உள்ளிட்டால் Form 1 & Form 2 தயாராகும்" else "Auto-generates Form 1 Diary & Form 2 TA Bill",
+                                    fontSize = 11.5.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = { showDiscardConfirmDialog = true }) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -1268,6 +1307,63 @@ fun QuickTourEntryDialog(
                 )
             }
         }
+    }
+}
+}
+
+    // Discard / Exit Confirmation Dialog when user clicks Close [X]
+    if (showDiscardConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirmDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Confirm Close",
+                    tint = CrimsonRed,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (isTamil) "பதிவை சேமிக்காமல் வெளியேறவா?" else "Exit Without Saving?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = Navy900
+                )
+            },
+            text = {
+                Text(
+                    text = if (isTamil)
+                        "உள்ளிட்ட பயண விவரங்கள் இன்னும் சேமிக்கப்படவில்லை. 'பயணத்தை சேமிக்க' பட்டன் அழுத்திய பிறகே பதிவு சேமிக்கப்படும்.\n\nஇப்போது வெளியேறினால் உள்ளிட்டவை மறைந்துவிடும். வெளியேற விரும்புகிறீர்களா?"
+                    else
+                        "You have unsaved details in this tour form. Tour details are only saved when you tap 'Save Tour'.\n\nIf you exit now, entered details will be lost. Do you wish to exit?",
+                    fontSize = 13.5.sp,
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDiscardConfirmDialog = false
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed)
+                ) {
+                    Text(if (isTamil) "வெளியேறு (Exit)" else "Exit Without Saving")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDiscardConfirmDialog = false }
+                ) {
+                    Text(
+                        text = if (isTamil) "தொடர்ந்து உள்ளிடு (Keep Editing)" else "Keep Editing",
+                        fontWeight = FontWeight.Bold,
+                        color = Navy800
+                    )
+                }
+            }
+        )
     }
 
     // Modal School Picker Sheet
