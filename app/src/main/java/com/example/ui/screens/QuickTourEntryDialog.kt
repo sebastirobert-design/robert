@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -146,11 +147,31 @@ fun QuickTourEntryDialog(
     var dayOfMonth by remember { mutableIntStateOf(defaultDay) }
     var dayStr by remember { mutableStateOf(String.format(Locale.US, "%02d", defaultDay)) }
     var departureStation by remember { mutableStateOf(editingEntry?.departureStation ?: "தலைமையிடம்") }
-    var departureHour by remember { mutableStateOf(DateUtils.formatStrictTime(editingEntry?.departureHour ?: "08:00 AM")) }
-    var arrivalHourOutbound by remember { mutableStateOf(DateUtils.formatStrictTime(editingEntry?.arrivalHour ?: "09:00 AM")) }
+    var departureHour by remember { mutableStateOf(DateUtils.formatStrictTime(editingEntry?.departureHour ?: "09:00 AM", "09:00 AM")) }
+    var arrivalHourOutbound by remember { mutableStateOf(DateUtils.formatStrictTime(editingEntry?.arrivalHour ?: "09:30 AM", "09:30 AM")) }
     var returnDepartureHour by remember { mutableStateOf(DateUtils.formatStrictTime("04:10 PM")) }
     var returnArrivalHour by remember { mutableStateOf(DateUtils.formatStrictTime("05:45 PM")) }
+
+    val standardPurposes = remember {
+        listOf(
+            "பள்ளிபார்வை" to "School Visit",
+            "பள்ளி ஆய்வு" to "Inspection",
+            "கலந்தாய்வு" to "Review / Counseling",
+            "கூட்டம்" to "Meeting",
+            "பயிற்சி" to "Training",
+            "வீரசிங்கம் கேஸ்" to "Court Case 1",
+            "சாத்தையா கேஸ்" to "Court Case 2",
+            "வினாத்தாள் தயாரிப்பு" to "Question Paper Prep"
+        )
+    }
+    val standardTaKeys = remember { standardPurposes.map { it.first }.toSet() }
+
     var purposeOfJourney by remember { mutableStateOf(editingEntry?.purposeOfJourney ?: "பள்ளிபார்வை") }
+    var customPurposeText by remember(editingEntry) {
+        val initialP = editingEntry?.purposeOfJourney ?: ""
+        mutableStateOf(if (initialP.isNotBlank() && initialP !in standardTaKeys) initialP else "டி.இ.ஆர் மீட்டிங்")
+    }
+
     var kindOfJourney by remember { mutableStateOf(editingEntry?.kindOfJourney ?: "பேருந்து") }
     var isRoundTrip by remember { mutableStateOf(true) }
     var customDistanceKmStr by remember { mutableStateOf(if (editingEntry != null && editingEntry.distanceKm > 0) editingEntry.distanceKm.toString() else "") }
@@ -167,8 +188,8 @@ fun QuickTourEntryDialog(
         dayOfMonth = targetEntry.dayOfMonth
         dayStr = String.format(Locale.US, "%02d", targetEntry.dayOfMonth)
         departureStation = targetEntry.departureStation.ifEmpty { "தலைமையிடம்" }
-        departureHour = DateUtils.formatStrictTime(targetEntry.departureHour.ifEmpty { "08:00 AM" })
-        arrivalHourOutbound = DateUtils.formatStrictTime(targetEntry.arrivalHour.ifEmpty { "09:00 AM" })
+        departureHour = DateUtils.formatStrictTime(targetEntry.departureHour.ifEmpty { "09:00 AM" }, "09:00 AM")
+        arrivalHourOutbound = DateUtils.formatStrictTime(targetEntry.arrivalHour.ifEmpty { "09:30 AM" }, "09:30 AM")
 
         val matchingReturn = existingEntries.firstOrNull {
             (targetEntry.tripGroupId.isNotEmpty() && it.tripGroupId == targetEntry.tripGroupId && it.isReturnLeg) ||
@@ -182,6 +203,9 @@ fun QuickTourEntryDialog(
             isRoundTrip = false
         }
         purposeOfJourney = targetEntry.purposeOfJourney.ifEmpty { "பள்ளிபார்வை" }
+        if (purposeOfJourney !in standardTaKeys) {
+            customPurposeText = purposeOfJourney
+        }
         kindOfJourney = targetEntry.kindOfJourney.ifEmpty { "பேருந்து" }
         customDistanceKmStr = if (targetEntry.distanceKm > 0) targetEntry.distanceKm.toString() else ""
         customBusFareStr = if (targetEntry.busFare > 0) String.format(Locale.US, "%.0f", targetEntry.busFare) else ""
@@ -270,8 +294,8 @@ fun QuickTourEntryDialog(
         "சொந்த வாகனம்" to "Own Vehicle"
     )
 
-    val timePresetsDeparture = listOf("08:00 AM", "08:30 AM", "09:00 AM", "07:30 AM")
-    val timePresetsArrival = listOf("09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM")
+    val timePresetsDeparture = listOf("09:00 AM", "08:30 AM", "08:00 AM", "09:30 AM")
+    val timePresetsArrival = listOf("09:30 AM", "10:00 AM", "09:00 AM", "10:30 AM")
 
     val existingEntriesForDay = remember(dayOfMonth, existingEntries, currentEditingEntry) {
         existingEntries.filter {
@@ -304,9 +328,9 @@ fun QuickTourEntryDialog(
             dayOfMonth,
             dateFormatted,
             departureStation,
-            DateUtils.formatStrictTime(departureHour, "08:00 AM"),
+            DateUtils.formatStrictTime(departureHour, "09:00 AM"),
             destinationsToSave,
-            DateUtils.formatStrictTime(arrivalHourOutbound, "09:00 AM"),
+            DateUtils.formatStrictTime(arrivalHourOutbound, "09:30 AM"),
             DateUtils.formatStrictTime(returnDepartureHour, "04:10 PM"),
             DateUtils.formatStrictTime(returnArrivalHour, "05:45 PM"),
             purposeOfJourney,
@@ -936,18 +960,112 @@ fun QuickTourEntryDialog(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Purpose Chips
+                            // Purpose Chips (8 Standard + 1 Editable DER Meeting / Custom)
+                            val isCustomPurposeActive = purposeOfJourney !in standardTaKeys
+
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                purposeOptions.forEach { (ta, en) ->
+                                // 8 Standard Purposes
+                                standardPurposes.forEach { (ta, en) ->
                                     val label = if (isTamil) ta else en
                                     FilterChip(
                                         selected = purposeOfJourney == ta,
                                         onClick = { purposeOfJourney = ta },
                                         label = { Text(label, fontSize = 11.5.sp) }
+                                    )
+                                }
+
+                                // 9th Purpose: "டி.இ.ஆர் மீட்டிங்" (Editable / Custom Purpose)
+                                val derChipLabel = if (isCustomPurposeActive && customPurposeText.isNotBlank() && customPurposeText != "டி.இ.ஆர் மீட்டிங்") {
+                                    "✏️ $customPurposeText"
+                                } else {
+                                    if (isTamil) "டி.இ.ஆர் மீட்டிங் (எடிட் ✏️)" else "DER Meeting (Edit ✏️)"
+                                }
+
+                                FilterChip(
+                                    selected = isCustomPurposeActive,
+                                    onClick = {
+                                        purposeOfJourney = customPurposeText.ifBlank { "டி.இ.ஆர் மீட்டிங்" }
+                                    },
+                                    label = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = derChipLabel,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = if (isCustomPurposeActive) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+
+                            // Editable text field when "டி.இ.ஆர் மீட்டிங்" / custom purpose is chosen
+                            AnimatedVisibility(visible = isCustomPurposeActive) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp)
+                                ) {
+                                    AppOutlinedTextField(
+                                        value = customPurposeText,
+                                        onValueChange = { input ->
+                                            customPurposeText = input
+                                            purposeOfJourney = input.ifBlank { "டி.இ.ஆர் மீட்டிங்" }
+                                        },
+                                        label = {
+                                            Text(
+                                                text = if (isTamil) "பயண நோக்கம் (எடிட் / விரும்பிய நோக்கம்)" else "Purpose of Journey (Edit / Custom)",
+                                                fontSize = 12.sp
+                                            )
+                                        },
+                                        placeholder = {
+                                            Text(
+                                                text = if (isTamil) "டி.இ.ஆர் மீட்டிங் அல்லது உங்கள் விருப்ப நோக்கம்..." else "DER Meeting or enter custom purpose...",
+                                                fontSize = 11.5.sp,
+                                                color = Color.Gray
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Edit Purpose",
+                                                tint = Navy700,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            if (customPurposeText.isNotBlank() && customPurposeText != "டி.இ.ஆர் மீட்டிங்") {
+                                                TextButton(
+                                                    onClick = {
+                                                        customPurposeText = "டி.இ.ஆர் மீட்டிங்"
+                                                        purposeOfJourney = "டி.இ.ஆர் மீட்டிங்"
+                                                    }
+                                                ) {
+                                                    Text(
+                                                        text = if (isTamil) "மீட்டமை" else "Reset",
+                                                        fontSize = 11.sp,
+                                                        color = CrimsonRed
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        supportingText = {
+                                            Text(
+                                                text = if (isTamil)
+                                                    "💡 'டி.இ.ஆர் மீட்டிங்' என்ற நோக்கத்தை எடிட் செய்து நாம் விரும்பிய எந்த நோக்கத்தையும் இங்கே தட்டச்சு செய்யலாம்"
+                                                else
+                                                    "💡 Edit 'DER Meeting' or enter any custom purpose not in the 8 options",
+                                                fontSize = 10.5.sp,
+                                                color = Color(0xFF1E40AF)
+                                            )
+                                        },
+                                        singleLine = true,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("custom_purpose_input")
                                     )
                                 }
                             }
@@ -1547,7 +1665,7 @@ private fun AppTimeField(
             }
         },
         label = { Text(label, maxLines = 1) },
-        placeholder = { Text("08:00 AM", color = Color.Gray, fontSize = 11.sp) },
+        placeholder = { Text("09:00 AM", color = Color.Gray, fontSize = 11.sp) },
         trailingIcon = {
             IconButton(
                 onClick = openTimePicker,

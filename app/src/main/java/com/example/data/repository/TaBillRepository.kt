@@ -85,9 +85,9 @@ class TaBillRepository(private val dao: TaBillDao) {
         dayOfMonth: Int,
         dateFormatted: String, // e.g. "02.07.2026"
         departureStation: String, // default "தலைமையிடம்"
-        departureHour: String, // "08:00 AM"
+        departureHour: String, // "09:00 AM"
         destinations: List<School>, // 1 or more schools
-        arrivalHourOutbound: String, // "09:00 AM"
+        arrivalHourOutbound: String, // "09:30 AM"
         returnDepartureHour: String, // "04:10 PM"
         returnArrivalHour: String, // "05:45 PM"
         purposeOfJourney: String, // "பள்ளிபார்வை"
@@ -111,8 +111,8 @@ class TaBillRepository(private val dao: TaBillDao) {
         val totalDistanceKm = customDistanceKm ?: destinations.sumOf { it.distanceKm() }
         val farePerLeg = customBusFare ?: destinations.sumOf { it.defaultBusFare.toDouble() }
 
-        val validDepHour = DateUtils.formatStrictTime(departureHour, "08:00 AM")
-        val validArrHour = DateUtils.formatStrictTime(arrivalHourOutbound, "09:00 AM")
+        val validDepHour = DateUtils.formatStrictTime(departureHour, "09:00 AM")
+        val validArrHour = DateUtils.formatStrictTime(arrivalHourOutbound, "09:30 AM")
         val validRetDepHour = DateUtils.formatStrictTime(returnDepartureHour, "04:10 PM")
         val validRetArrHour = DateUtils.formatStrictTime(returnArrivalHour, "05:45 PM")
 

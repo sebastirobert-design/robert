@@ -161,7 +161,7 @@ object DateUtils {
      * "9:00" -> "09:00 AM"
      * "16:15" -> "04:15 PM"
      */
-    fun formatStrictTime(raw: String, defaultTime: String = "08:00 AM"): String {
+    fun formatStrictTime(raw: String, defaultTime: String = "09:00 AM"): String {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return defaultTime
 
@@ -169,7 +169,7 @@ object DateUtils {
         val match = regex.find(trimmed)
         if (match != null) {
             val (hStr, mStr, amPmStr) = match.destructured
-            var h = hStr.toIntOrNull() ?: 8
+            var h = hStr.toIntOrNull() ?: 9
             val m = mStr.toIntOrNull() ?: 0
             var amPm = amPmStr.uppercase(Locale.US)
 

@@ -21,12 +21,12 @@ data class TourEntry(
     // Columns 1, 2, 3 (DEPARTURE)
     val departureStation: String = "தலைமையிடம்",
     val departureDate: String = "01.07.2026",
-    val departureHour: String = "08:00 AM",
+    val departureHour: String = "09:00 AM",
     
     // Columns 4, 5, 6 (ARRIVAL)
     val arrivalStation: String = "",
     val arrivalDate: String = "01.07.2026",
-    val arrivalHour: String = "09:00 AM",
+    val arrivalHour: String = "09:30 AM",
     
     // Column 7: Purpose of Journey
     val purposeOfJourney: String = "பள்ளிபார்வை", // பள்ளிபார்வை, கலந்தாய்வு, வீரசிங்கம் கேஸ், மீட்டிங், பயிற்சி, etc.
