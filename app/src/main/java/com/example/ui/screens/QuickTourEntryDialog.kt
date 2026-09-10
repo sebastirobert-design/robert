@@ -26,14 +26,20 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -52,6 +58,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -79,6 +86,7 @@ import com.example.data.model.TourEntry
 import com.example.ui.components.SchoolPickerSheet
 import com.example.ui.theme.AmberDark
 import com.example.ui.theme.BlueAccent
+import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.EmeraldGreen
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.Navy700
@@ -95,6 +103,8 @@ fun QuickTourEntryDialog(
     allSchools: List<School>,
     monthYear: String,
     editingEntry: TourEntry?,
+    existingEntries: List<TourEntry> = emptyList(),
+    activeOfficerName: String = "",
     onSaveTour: (
         dayOfMonth: Int,
         dateFormatted: String,
@@ -109,7 +119,8 @@ fun QuickTourEntryDialog(
         isRoundTrip: Boolean,
         customDistanceKm: Int?,
         customBusFare: Double?,
-        remarks: String
+        remarks: String,
+        entryToReplace: TourEntry?
     ) -> Unit,
     onExportToCsv: () -> Unit = {},
     onDismiss: () -> Unit,
@@ -117,13 +128,18 @@ fun QuickTourEntryDialog(
     initialDay: Int = DateUtils.getCurrentCalendar().get(java.util.Calendar.DAY_OF_MONTH),
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val (year, month) = DateUtils.parseYearMonth(monthYear)
     val defaultDay = (editingEntry?.dayOfMonth ?: initialDay).coerceIn(1, 31)
 
     // Form states
+    var currentEditingEntry by remember(editingEntry) { mutableStateOf(editingEntry) }
+    var isEditingMode by remember(editingEntry) { mutableStateOf(editingEntry != null) }
+    var showAlreadyExistsConfirmDialog by remember { mutableStateOf(false) }
+
     var dayOfMonth by remember { mutableIntStateOf(defaultDay) }
-    var dayStr by remember { mutableStateOf(String.format("%02d", defaultDay)) }
+    var dayStr by remember { mutableStateOf(String.format(Locale.US, "%02d", defaultDay)) }
     var departureStation by remember { mutableStateOf(editingEntry?.departureStation ?: "தலைமையிடம்") }
     var departureHour by remember { mutableStateOf(DateUtils.formatStrictTime(editingEntry?.departureHour ?: "08:00 AM")) }
     var arrivalHourOutbound by remember { mutableStateOf(DateUtils.formatStrictTime(editingEntry?.arrivalHour ?: "09:00 AM")) }
@@ -133,13 +149,62 @@ fun QuickTourEntryDialog(
     var kindOfJourney by remember { mutableStateOf(editingEntry?.kindOfJourney ?: "பேருந்து") }
     var isRoundTrip by remember { mutableStateOf(true) }
     var customDistanceKmStr by remember { mutableStateOf(if (editingEntry != null && editingEntry.distanceKm > 0) editingEntry.distanceKm.toString() else "") }
-    var customBusFareStr by remember { mutableStateOf(if (editingEntry != null && editingEntry.busFare > 0) String.format("%.0f", editingEntry.busFare) else "") }
+    var customBusFareStr by remember { mutableStateOf(if (editingEntry != null && editingEntry.busFare > 0) String.format(Locale.US, "%.0f", editingEntry.busFare) else "") }
     var remarks by remember { mutableStateOf(editingEntry?.remarks ?: "") }
 
     val selectedDestinations = remember { mutableStateListOf<School>() }
     var showSchoolPicker by remember { mutableStateOf(false) }
 
-    // Pre-populate destination if editing
+    // Lambda to load an existing tour entry into the form for editing
+    val loadExistingEntry: (TourEntry) -> Unit = { targetEntry ->
+        currentEditingEntry = targetEntry
+        isEditingMode = true
+        dayOfMonth = targetEntry.dayOfMonth
+        dayStr = String.format(Locale.US, "%02d", targetEntry.dayOfMonth)
+        departureStation = targetEntry.departureStation.ifEmpty { "தலைமையிடம்" }
+        departureHour = DateUtils.formatStrictTime(targetEntry.departureHour.ifEmpty { "08:00 AM" })
+        arrivalHourOutbound = DateUtils.formatStrictTime(targetEntry.arrivalHour.ifEmpty { "09:00 AM" })
+
+        val matchingReturn = existingEntries.firstOrNull {
+            (targetEntry.tripGroupId.isNotEmpty() && it.tripGroupId == targetEntry.tripGroupId && it.isReturnLeg) ||
+            (it.dayOfMonth == targetEntry.dayOfMonth && it.isReturnLeg)
+        }
+        if (matchingReturn != null) {
+            isRoundTrip = true
+            returnDepartureHour = DateUtils.formatStrictTime(matchingReturn.departureHour.ifEmpty { "04:10 PM" })
+            returnArrivalHour = DateUtils.formatStrictTime(matchingReturn.arrivalHour.ifEmpty { "05:45 PM" })
+        } else {
+            isRoundTrip = false
+        }
+        purposeOfJourney = targetEntry.purposeOfJourney.ifEmpty { "பள்ளிபார்வை" }
+        kindOfJourney = targetEntry.kindOfJourney.ifEmpty { "பேருந்து" }
+        customDistanceKmStr = if (targetEntry.distanceKm > 0) targetEntry.distanceKm.toString() else ""
+        customBusFareStr = if (targetEntry.busFare > 0) String.format(Locale.US, "%.0f", targetEntry.busFare) else ""
+        remarks = targetEntry.remarks
+
+        selectedDestinations.clear()
+        val parts = targetEntry.arrivalStation.split(".", ",")
+        for (p in parts) {
+            val trimmed = p.trim()
+            if (trimmed.isNotEmpty()) {
+                val matchingSchool = allSchools.find { it.nameTa == trimmed || it.nameEn.equals(trimmed, ignoreCase = true) }
+                if (matchingSchool != null) {
+                    selectedDestinations.add(matchingSchool)
+                } else {
+                    selectedDestinations.add(
+                        School(
+                            nameEn = trimmed,
+                            nameTa = trimmed,
+                            distanceFromHqKm = targetEntry.distanceKm,
+                            defaultBusFare = targetEntry.busFare.toInt()
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    // Pre-populate destination if editing initially
     remember(editingEntry) {
         if (editingEntry != null && selectedDestinations.isEmpty()) {
             val matchingSchool = allSchools.find {
@@ -203,6 +268,52 @@ fun QuickTourEntryDialog(
     val timePresetsDeparture = listOf("08:00 AM", "08:30 AM", "09:00 AM", "07:30 AM")
     val timePresetsArrival = listOf("09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM")
 
+    val existingEntriesForDay = remember(dayOfMonth, existingEntries, currentEditingEntry) {
+        existingEntries.filter {
+            it.dayOfMonth == dayOfMonth && (
+                currentEditingEntry == null || (
+                    (it.tripGroupId.isNotEmpty() && it.tripGroupId != currentEditingEntry?.tripGroupId) ||
+                    (it.tripGroupId.isEmpty() && it.id != currentEditingEntry?.id)
+                )
+            )
+        }
+    }
+
+    val performSave: () -> Unit = {
+        val destinationsToSave = if (selectedDestinations.isNotEmpty()) {
+            selectedDestinations.toList()
+        } else {
+            listOf(
+                School(
+                    nameEn = "PUPS MUNAIVENDRI",
+                    nameTa = "முனைவென்றி",
+                    distanceFromHqKm = 15,
+                    defaultBusFare = 15
+                )
+            )
+        }
+
+        val dateFormatted = DateUtils.formatDate(year, month, dayOfMonth)
+
+        onSaveTour(
+            dayOfMonth,
+            dateFormatted,
+            departureStation,
+            DateUtils.formatStrictTime(departureHour, "08:00 AM"),
+            destinationsToSave,
+            DateUtils.formatStrictTime(arrivalHourOutbound, "09:00 AM"),
+            DateUtils.formatStrictTime(returnDepartureHour, "04:10 PM"),
+            DateUtils.formatStrictTime(returnArrivalHour, "05:45 PM"),
+            purposeOfJourney,
+            kindOfJourney,
+            isRoundTrip,
+            customDistanceKmStr.toIntOrNull(),
+            customBusFareStr.toDoubleOrNull(),
+            remarks,
+            currentEditingEntry
+        )
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -265,6 +376,57 @@ fun QuickTourEntryDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
+                // Editing status banner if an existing entry is being edited
+                if (isEditingMode && currentEditingEntry != null) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD)),
+                            border = BorderStroke(1.dp, Color(0xFF1976D2)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Editing",
+                                        tint = Color(0xFF1565C0),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isTamil) "இப்பதிவை திருத்துகிறீர்கள் (Editing Mode)" else "Editing Existing Tour",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF0D47A1)
+                                    )
+                                }
+                                TextButton(
+                                    onClick = {
+                                        currentEditingEntry = null
+                                        isEditingMode = false
+                                    }
+                                ) {
+                                    Text(
+                                        text = if (isTamil) "புதிய பதிவாக மாற்றுக" else "Cancel Edit",
+                                        fontSize = 11.5.sp,
+                                        color = CrimsonRed
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // 1. DATE & DAY SELECTION
                 item {
                     Card(
@@ -283,8 +445,27 @@ fun QuickTourEntryDialog(
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
+                                // Previous Day Button
+                                IconButton(
+                                    onClick = {
+                                        if (dayOfMonth > 1) {
+                                            dayOfMonth -= 1
+                                            dayStr = String.format(Locale.US, "%02d", dayOfMonth)
+                                        }
+                                    },
+                                    enabled = dayOfMonth > 1,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronLeft,
+                                        contentDescription = "Previous Day",
+                                        tint = if (dayOfMonth > 1) Navy800 else Color.LightGray
+                                    )
+                                }
+
                                 AppOutlinedTextField(
                                     value = dayStr,
                                     onValueChange = { input ->
@@ -295,10 +476,10 @@ fun QuickTourEntryDialog(
                                             dayOfMonth = day
                                         }
                                     },
-                                    label = { Text(if (isTamil) "தேதி (Day 1-31)" else "Day (1-31)") },
+                                    label = { Text(if (isTamil) "தேதி" else "Day") },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     modifier = Modifier
-                                        .width(130.dp)
+                                        .width(85.dp)
                                         .testTag("tour_day_input")
                                         .onFocusChanged { focusState ->
                                             if (!focusState.isFocused) {
@@ -317,24 +498,204 @@ fun QuickTourEntryDialog(
                                     singleLine = true
                                 )
 
+                                // Next Day Button
+                                IconButton(
+                                    onClick = {
+                                        if (dayOfMonth < 31) {
+                                            dayOfMonth += 1
+                                            dayStr = String.format(Locale.US, "%02d", dayOfMonth)
+                                        }
+                                    },
+                                    enabled = dayOfMonth < 31,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Next Day",
+                                        tint = if (dayOfMonth < 31) Navy800 else Color.LightGray
+                                    )
+                                }
+
                                 val formattedDate = DateUtils.formatDate(year, month, dayOfMonth)
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = Color(0xFFE8EAF6),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            val datePicker = android.app.DatePickerDialog(
+                                                context,
+                                                { _, _, _, d ->
+                                                    dayOfMonth = d
+                                                    dayStr = String.format(Locale.US, "%02d", d)
+                                                },
+                                                year,
+                                                month - 1,
+                                                dayOfMonth
+                                            )
+                                            datePicker.show()
+                                        }
                                 ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = formattedDate,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Navy900
+                                            )
+                                            Text(
+                                                text = DateUtils.getDayOfWeekTamil(formattedDate),
+                                                fontSize = 11.sp,
+                                                color = TextSecondary
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = Icons.Default.CalendarMonth,
+                                            contentDescription = "Pick Date",
+                                            tint = Navy700,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // ALREADY EXISTS WARNING CARD
+                            if (existingEntriesForDay.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("already_exists_warning_card"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)),
+                                    border = BorderStroke(1.5.dp, Color(0xFFF57F17))
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        // Header
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Warning,
+                                                contentDescription = "Already Exists",
+                                                tint = Color(0xFFE65100),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (isTamil) "already exists (இத்தேதியில் ஏற்கெனவே பதிவு உள்ளது!)" else "already exists (Entry already exists on this date!)",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFB71C1C)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        // Officer and Date Info
+                                        val displayOfficer = if (activeOfficerName.isNotBlank()) activeOfficerName else "B.E.O."
+                                        val formattedDate = DateUtils.formatDate(year, month, dayOfMonth)
                                         Text(
-                                            text = formattedDate,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
+                                            text = if (isTamil) "அலுவலர்: $displayOfficer • தேதி: $formattedDate" else "Officer: $displayOfficer • Date: $formattedDate",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = Navy900
                                         )
-                                        Text(
-                                            text = DateUtils.getDayOfWeekTamil(formattedDate),
-                                            fontSize = 11.sp,
-                                            color = TextSecondary
-                                        )
+
+                                        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = Color(0xFFFFD54F))
+
+                                        // Recorded Details on that Date
+                                        val mainEntry = existingEntriesForDay.firstOrNull { !it.isReturnLeg } ?: existingEntriesForDay.first()
+                                        val returnEntry = existingEntriesForDay.firstOrNull { it.isReturnLeg }
+
+                                        if (mainEntry.isNonTravel) {
+                                            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                                Text(text = if (isTamil) "வகை: " else "Type: ", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Navy900)
+                                                Text(text = mainEntry.nonTravelType, fontSize = 12.sp, color = CrimsonRed, fontWeight = FontWeight.Bold)
+                                            }
+                                            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                                Text(text = if (isTamil) "விவரம்: " else "Details: ", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Navy900)
+                                                Text(text = mainEntry.purposeOfJourney, fontSize = 12.sp, color = TextPrimary)
+                                            }
+                                        } else {
+                                            // Route
+                                            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                                Text(text = if (isTamil) "வழித்தடம்: " else "Route: ", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Navy900)
+                                                Text(
+                                                    text = "${mainEntry.departureStation} ➔ ${mainEntry.arrivalStation}",
+                                                    fontSize = 12.sp,
+                                                    color = Navy900,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            // Purpose & Mode
+                                            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                                Text(text = if (isTamil) "நோக்கம்: " else "Purpose: ", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Navy900)
+                                                Text(
+                                                    text = "${mainEntry.purposeOfJourney}  (${mainEntry.kindOfJourney})",
+                                                    fontSize = 12.sp,
+                                                    color = TextPrimary
+                                                )
+                                            }
+                                            // Timings
+                                            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                                Text(text = if (isTamil) "நேரம்: " else "Timings: ", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Navy900)
+                                                val timeStr = if (returnEntry != null) {
+                                                    "${mainEntry.departureHour} - ${mainEntry.arrivalHour} (திரும்புதல்: ${returnEntry.departureHour} - ${returnEntry.arrivalHour})"
+                                                } else {
+                                                    "${mainEntry.departureHour} - ${mainEntry.arrivalHour}"
+                                                }
+                                                Text(text = timeStr, fontSize = 11.5.sp, color = TextPrimary)
+                                            }
+                                            // Distance, Fare & TA
+                                            Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                                Text(text = if (isTamil) "கணக்கீடு: " else "Calculation: ", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Navy900)
+                                                Text(
+                                                    text = "${mainEntry.distanceKm} km • பஸ்: ₹${String.format(Locale.US, "%.0f", mainEntry.busFare)} • DA: ₹${String.format(Locale.US, "%.0f", mainEntry.daAmount)} • மொத்தம்: ₹${String.format(Locale.US, "%.0f", existingEntriesForDay.sumOf { it.grandTotal })}",
+                                                    fontSize = 11.5.sp,
+                                                    color = Color(0xFF1B5E20),
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            if (mainEntry.remarks.isNotBlank()) {
+                                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                                                    Text(text = if (isTamil) "குறிப்பு: " else "Remarks: ", fontWeight = FontWeight.Bold, fontSize = 11.5.sp, color = Navy900)
+                                                    Text(text = mainEntry.remarks, fontSize = 11.5.sp, color = TextSecondary)
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        // Action Button: "விரும்பினால் edit செய்யும் வசதி"
+                                        Button(
+                                            onClick = {
+                                                loadExistingEntry(mainEntry)
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("edit_existing_entry_btn"),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Navy800),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Edit",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (isTamil) "இப்பதிவை திருத்து (Edit Existing Details)" else "Edit Existing Details",
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -846,49 +1207,32 @@ fun QuickTourEntryDialog(
             // Save Action Button
             Button(
                 onClick = {
-                    val destinationsToSave = if (selectedDestinations.isNotEmpty()) {
-                        selectedDestinations.toList()
+                    if (existingEntriesForDay.isNotEmpty() && currentEditingEntry == null) {
+                        showAlreadyExistsConfirmDialog = true
                     } else {
-                        listOf(
-                            School(
-                                nameEn = "PUPS MUNAIVENDRI",
-                                nameTa = "முனைவென்றி",
-                                distanceFromHqKm = 15,
-                                defaultBusFare = 15
-                            )
-                        )
+                        performSave()
                     }
-
-                    val dateFormatted = DateUtils.formatDate(year, month, dayOfMonth)
-
-                    onSaveTour(
-                        dayOfMonth,
-                        dateFormatted,
-                        departureStation,
-                        DateUtils.formatStrictTime(departureHour, "08:00 AM"),
-                        destinationsToSave,
-                        DateUtils.formatStrictTime(arrivalHourOutbound, "09:00 AM"),
-                        DateUtils.formatStrictTime(returnDepartureHour, "04:10 PM"),
-                        DateUtils.formatStrictTime(returnArrivalHour, "05:45 PM"),
-                        purposeOfJourney,
-                        kindOfJourney,
-                        isRoundTrip,
-                        customDistanceKmStr.toIntOrNull(),
-                        customBusFareStr.toDoubleOrNull(),
-                        remarks
-                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
                     .testTag("save_quick_tour_btn"),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Navy700)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isEditingMode || currentEditingEntry != null) Navy800 else Navy700
+                )
             ) {
-                Icon(imageVector = Icons.Default.Check, contentDescription = "Save")
+                Icon(
+                    imageVector = if (isEditingMode || currentEditingEntry != null) Icons.Default.Edit else Icons.Default.Check,
+                    contentDescription = "Save"
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (isTamil) "பயணத்தை சேமிக்க (Save Tour)" else "Save Tour & Generate Bills",
+                    text = if (isEditingMode || currentEditingEntry != null) {
+                        if (isTamil) "மாற்றங்களைச் சேமிக்க (Update Tour)" else "Update Tour & Refresh Bills"
+                    } else {
+                        if (isTamil) "பயணத்தை சேமிக்க (Save Tour)" else "Save Tour & Generate Bills"
+                    },
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -948,6 +1292,117 @@ fun QuickTourEntryDialog(
             onDismiss = { showSchoolPicker = false },
             isTamil = isTamil,
             isMultiSelect = true
+        )
+    }
+
+    // Duplicate Date Already Exists Confirmation Dialog
+    if (showAlreadyExistsConfirmDialog && existingEntriesForDay.isNotEmpty()) {
+        val mainEntry = existingEntriesForDay.firstOrNull { !it.isReturnLeg } ?: existingEntriesForDay.first()
+        val displayOfficer = if (activeOfficerName.isNotBlank()) activeOfficerName else "B.E.O."
+        val formattedDate = DateUtils.formatDate(year, month, dayOfMonth)
+
+        AlertDialog(
+            onDismissRequest = { showAlreadyExistsConfirmDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Warning",
+                    tint = Color(0xFFE65100),
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "already exists",
+                    fontWeight = FontWeight.Bold,
+                    color = CrimsonRed,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = if (isTamil)
+                            "$formattedDate தேதியில் அலுவலர் $displayOfficer-க்கு ஏற்கெனவே ஒரு பதிவு உள்ளது!"
+                        else
+                            "An entry already exists for Officer $displayOfficer on $formattedDate!",
+                        fontWeight = FontWeight.SemiBold,
+                        color = Navy900,
+                        fontSize = 13.5.sp
+                    )
+
+                    Surface(
+                        color = Color(0xFFFFF8E1),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFFD54F)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = if (isTamil) "ஏற்கெனவே உள்ள விவரம்:" else "Existing Details:",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = Navy900
+                            )
+                            if (mainEntry.isNonTravel) {
+                                Text(text = "• வகை: ${mainEntry.nonTravelType}", fontSize = 11.5.sp)
+                                Text(text = "• விவரம்: ${mainEntry.purposeOfJourney}", fontSize = 11.5.sp)
+                            } else {
+                                Text(text = "• தடம்: ${mainEntry.departureStation} ➔ ${mainEntry.arrivalStation}", fontSize = 11.5.sp)
+                                Text(text = "• நோக்கம்: ${mainEntry.purposeOfJourney} (${mainEntry.kindOfJourney})", fontSize = 11.5.sp)
+                                Text(text = "• நேரம்: ${mainEntry.departureHour} - ${mainEntry.arrivalHour}", fontSize = 11.5.sp)
+                                Text(
+                                    text = "• கட்டணம்: ₹${String.format(Locale.US, "%.0f", mainEntry.busFare)} • மொத்தம்: ₹${String.format(Locale.US, "%.0f", existingEntriesForDay.sumOf { it.grandTotal })}",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1B5E20)
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = if (isTamil)
+                            "நீங்கள் பழைய பதிவை திருத்த விரும்புகிறீர்களா (Edit), அல்லது புதியதாக மாற்றியமைக்க விரும்புகிறீர்களா (Overwrite)?"
+                        else
+                            "Do you want to edit the existing entry or overwrite it with these new details?",
+                        fontSize = 12.sp,
+                        color = TextPrimary
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAlreadyExistsConfirmDialog = false
+                        loadExistingEntry(mainEntry)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Navy800)
+                ) {
+                    Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isTamil) "பழையதை திருத்து (Edit)" else "Edit Existing")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextButton(
+                        onClick = { showAlreadyExistsConfirmDialog = false }
+                    ) {
+                        Text(if (isTamil) "ரத்து (Cancel)" else "Cancel", color = TextSecondary)
+                    }
+                    Button(
+                        onClick = {
+                            showAlreadyExistsConfirmDialog = false
+                            currentEditingEntry = mainEntry
+                            performSave()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed)
+                    ) {
+                        Text(if (isTamil) "மாற்றியமை (Overwrite)" else "Overwrite")
+                    }
+                }
+            }
         )
     }
 }

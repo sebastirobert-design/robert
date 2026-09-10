@@ -81,8 +81,13 @@ data class TourEntry(
 
     /**
      * Form 2 TA Calculation Eligibility:
-     * Excludes holiday (விடுமுறை), casual leave (தற்செயல் விடுப்பு), office duty (அலுவலகப் பணி),
-     * and includes ONLY entries where kind of journey (column 8) uses bus (பேருந்து) or train (இரயில்/ரயில்).
+     * 1. In Form 1, if column 4 (arrivalStation) or other fields contains:
+     *    - விடுமுறை (Holiday)
+     *    - தற்செயல் விடுப்பு (Casual Leave / CL)
+     *    - அலுவலகப் பணி / அலுவலகப்பணி (Office Duty)
+     *    those rows will NOT come to Form 2 for TA calculation.
+     * 2. In Form 1, only if column 8 (kindOfJourney) is பேருந்து (Bus) or இரயில் / ரயில் (Train),
+     *    only those rows will come to Form 2 for TA calculation.
      */
     val isTaEligible: Boolean
         get() {
@@ -90,22 +95,27 @@ data class TourEntry(
             val arr = arrivalStation.trim()
             val dep = departureStation.trim()
             val nonType = nonTravelType.trim()
+            val purpose = purposeOfJourney.trim()
             val kind = kindOfJourney.trim()
 
-            val isExcludedKeyword = arr.contains("விடுமுறை") || arr.contains("Holiday", ignoreCase = true) ||
-                arr.contains("தற்செயல்") || arr.contains("CL", ignoreCase = true) ||
+            // Check for விடுமுறை (Holiday), தற்செயல் விடுப்பு (CL), or அலுவலகப் பணி (Office Duty)
+            val isExcluded = arr.contains("விடுமுறை") || arr.contains("Holiday", ignoreCase = true) ||
+                arr.contains("தற்செயல்") || arr.contains("CL", ignoreCase = true) || arr.contains("Leave", ignoreCase = true) ||
                 arr.contains("அலுவலக") || arr.contains("Office", ignoreCase = true) ||
+                arr.contains("சனிக்கிழமை") || arr.contains("ஞாயிற்றுக்கிழமை") ||
                 dep.contains("விடுமுறை") || dep.contains("Holiday", ignoreCase = true) ||
                 dep.contains("தற்செயல்") || dep.contains("CL", ignoreCase = true) ||
-                dep.contains("சனிக்கிழமை") || dep.contains("ஞாயிற்றுக்கிழமை") ||
-                nonType.contains("விடுமுறை") || nonType.contains("தற்செயல்") || nonType.contains("அலுவலக")
+                dep.contains("அலுவலக") || dep.contains("Office", ignoreCase = true) ||
+                nonType.contains("விடுமுறை") || nonType.contains("தற்செயல்") || nonType.contains("அலுவலக") ||
+                purpose.contains("விடுமுறை") || purpose.contains("தற்செயல்") || purpose.contains("அலுவலக")
 
-            if (isExcludedKeyword) return false
+            if (isExcluded) return false
 
+            // Column 8: kind of journey must be பேருந்து (Bus) or இரயில் / ரயில் (Train)
             val isBusOrTrain = kind.contains("பேருந்து") || kind.contains("bus", ignoreCase = true) ||
                 kind.contains("இரயில்") || kind.contains("ரயில்") || kind.contains("train", ignoreCase = true) ||
                 kind.contains("rail", ignoreCase = true)
 
-            return isBusOrTrain && (distanceKm > 0 || busFare > 0.0 || railAmount > 0.0 || daAmount > 0.0 || terminalCharge17a > 0.0)
+            return isBusOrTrain
         }
 }

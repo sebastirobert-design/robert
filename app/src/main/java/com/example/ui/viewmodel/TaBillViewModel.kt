@@ -258,7 +258,8 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
         isRoundTrip: Boolean,
         customDistanceKm: Int?,
         customBusFare: Double?,
-        remarks: String
+        remarks: String,
+        entryToReplace: TourEntry? = null
     ) {
         viewModelScope.launch {
             val state = uiState.value
@@ -267,6 +268,11 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
             val daAmount = state.appSettings.defaultDaAmount
             val t17a = state.appSettings.defaultTerminal17a
             val t17b = state.appSettings.defaultTerminal17b
+
+            val toReplace = entryToReplace ?: _editingTourEntry.value
+            if (toReplace != null) {
+                repository.deleteTourEntry(toReplace)
+            }
 
             repository.addQuickTourTrip(
                 officerId = officerId,
@@ -291,7 +297,11 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
                 remarks = remarks
             )
             closeQuickTourDialog()
-            _feedbackMessage.value = "பயணம் வெற்றிகரமாக சேர்க்கப்பட்டது! (Tour Added)"
+            _feedbackMessage.value = if (toReplace != null) {
+                "பயண விவரம் வெற்றிகரமாக மாற்றப்பட்டது! (Tour Updated)"
+            } else {
+                "பயணம் வெற்றிகரமாக சேர்க்கப்பட்டது! (Tour Added)"
+            }
         }
     }
 
@@ -446,7 +456,8 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
             PrintExportHelper.printHtmlDocument(
                 context = context,
                 htmlContent = html,
-                jobName = "TA_Bill_${state.selectedMonthYear}"
+                jobName = "TA_Bill_${state.selectedMonthYear}",
+                isLandscape = true
             )
             _feedbackMessage.value = if (state.isTamil) "படிவம் 2 அச்சு அனுப்பப்பட்டது" else "Form 2 sent to printer"
         } catch (e: Throwable) {

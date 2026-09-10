@@ -181,7 +181,7 @@ object PrintExportHelper {
         val monthBillHeader = DateUtils.getBillMonthHeader(monthYear)
         val englishMonth = DateUtils.getEnglishMonthDisplay(monthYear)
         val basicPayFormatted = String.format("%.0f", officer.basicPay)
-        val travelEntries = entries.filter { !it.isNonTravel }
+        val travelEntries = entries.filter { it.isTaEligible }
 
         val totalKm = travelEntries.sumOf { it.distanceKm }
         val totalBusFare = travelEntries.sumOf { it.busFare }
@@ -279,8 +279,8 @@ object PrintExportHelper {
                             <!-- 4 to 6 Arrival -->
                             <th>4. Arr. Station</th><th>5. Arr. Date</th><th>6. Arr. Hour</th>
                             <!-- 7, 8, 9 -->
-                            <th>7. Purpose of Journey</th>
-                            <th>8. Kind of Journey</th>
+                            <th>7. Kind of Journey</th>
+                            <th>8. Purpose of Journey</th>
                             <th>9. No. of km</th>
                             <!-- 10, 11, 12 Rail -->
                             <th>10. Class</th><th>11. No. of fares</th><th>12. Amount</th>
@@ -347,8 +347,8 @@ object PrintExportHelper {
                     <td class="col-left">$arrStation</td>
                     <td>$arrDate</td>
                     <td>$arrHour</td>
-                    <td class="col-left">$purpose</td>
                     <td>$mode</td>
+                    <td class="col-left">$purpose</td>
                     <td>$distance</td>
                     <td>$railClass</td>
                     <td>$noOfFares</td>
@@ -407,8 +407,8 @@ object PrintExportHelper {
                         <td class="col-left">$returnArrStation</td>
                         <td>$depDate</td>
                         <td>$returnArrHour</td>
-                        <td class="col-left"></td>
                         <td>$mode</td>
+                        <td class="col-left"></td>
                         <td>$distance</td>
                         <td></td>
                         <td></td>
@@ -820,8 +820,8 @@ object PrintExportHelper {
             58f, // 4. Arr. Station
             42f, // 5. Arr. Date
             36f, // 6. Arr. Hour
-            66f, // 7. Purpose of Journey
-            36f, // 8. Kind of Journey
+            36f, // 7. Kind of Journey
+            66f, // 8. Purpose of Journey
             28f, // 9. No. of km
             24f, // 10. Class
             24f, // 11. No. of Fares
@@ -841,7 +841,7 @@ object PrintExportHelper {
         val headerTitles = arrayOf(
             "Dep. Station", "Dep. Date", "Dep. Hour",
             "Arr. Station", "Arr. Date", "Arr. Hour",
-            "Purpose of Journey", "Kind", "No. of km",
+            "Kind", "Purpose of Journey", "No. of km",
             "Class", "No. fares", "Amount",
             "Bus Fare", "Road Dist",
             "DA Rate", "DA Amount",
@@ -952,7 +952,7 @@ object PrintExportHelper {
                     arrayOf(
                         depStation, depDate, depHour,
                         arrStation, arrDate, arrHour,
-                        purpose, mode, km,
+                        mode, purpose, km,
                         railClass, noOfFares, railAmount,
                         fare, roadDist,
                         daRate, daAmount,
@@ -1002,7 +1002,7 @@ object PrintExportHelper {
                         arrayOf(
                             returnDepStation, depDate, returnDepHour,
                             returnArrStation, depDate, returnArrHour,
-                            "", mode, km,
+                            mode, "", km,
                             "", "", "",
                             returnFare, "",
                             "", "0",
@@ -1452,8 +1452,8 @@ _Generated via TA Bill & Tour Diary Mobile App_
             "4. Arr. Station",
             "5. Arr. Date",
             "6. Arr. Hour",
-            "7. Purpose of Journey",
-            "8. Kind of Journey",
+            "7. Kind of Journey",
+            "8. Purpose of Journey",
             "9. No. of km",
             "10. Class",
             "11. No. of Fares",
@@ -1508,8 +1508,8 @@ _Generated via TA Bill & Tour Diary Mobile App_
                 arrStation,
                 arrDate,
                 arrHour,
-                purpose,
                 mode,
+                purpose,
                 distance,
                 railClass,
                 noOfFares,
@@ -1560,8 +1560,8 @@ _Generated via TA Bill & Tour Diary Mobile App_
                     returnArrStation,
                     depDate,
                     returnArrHour,
-                    "", // நோக்கம் காலியாக விடப்படும்
                     mode,
+                    "", // நோக்கம் காலியாக விடப்படும்
                     distance,
                     "", // 10. Class (காலி)
                     "", // 11. No of fares (காலி)

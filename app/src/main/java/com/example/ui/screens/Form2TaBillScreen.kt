@@ -298,9 +298,9 @@ fun Form2TaBillScreen(
                                 SubHeaderCell(text = "Station", width = 130.dp)
                                 SubHeaderCell(text = "Date", width = 65.dp)
                                 SubHeaderCell(text = "Hour", width = 55.dp)
-                                // 7-9 Purpose, Mode, Km
-                                SubHeaderCell(text = "Purpose of Journey", width = 120.dp)
+                                // 7-9 Mode, Purpose, Km
                                 SubHeaderCell(text = "Kind of\nJourney", width = 60.dp)
+                                SubHeaderCell(text = "Purpose of Journey", width = 120.dp)
                                 SubHeaderCell(text = "No. of\nkm", width = 45.dp)
                                 // 10-12 Rail
                                 SubHeaderCell(text = "Class", width = 45.dp)
@@ -340,8 +340,8 @@ fun Form2TaBillScreen(
                                 NumberCell(text = "4", width = 130.dp)
                                 NumberCell(text = "5", width = 65.dp)
                                 NumberCell(text = "6", width = 55.dp)
-                                NumberCell(text = "7", width = 120.dp)
-                                NumberCell(text = "8", width = 60.dp)
+                                NumberCell(text = "7", width = 60.dp)
+                                NumberCell(text = "8", width = 120.dp)
                                 NumberCell(text = "9", width = 45.dp)
                                 NumberCell(text = "10", width = 45.dp)
                                 NumberCell(text = "11", width = 50.dp)
@@ -402,8 +402,8 @@ fun Form2TaBillScreen(
                                     DataCell(text = entry.arrivalStation, width = 130.dp, alignLeft = true)
                                     DataCell(text = dateShortArr, width = 65.dp)
                                     DataCell(text = entry.arrivalHour, width = 55.dp)
-                                    DataCell(text = if (entry.isReturnLeg) "" else entry.purposeOfJourney, width = 120.dp, alignLeft = true)
                                     DataCell(text = entry.kindOfJourney, width = 60.dp)
+                                    DataCell(text = if (entry.isReturnLeg) "" else entry.purposeOfJourney, width = 120.dp, alignLeft = true)
                                     DataCell(text = if (entry.distanceKm > 0) entry.distanceKm.toString() else "", width = 45.dp)
                                     DataCell(text = entry.railClass, width = 45.dp)
                                     DataCell(text = entry.railNoOfFares, width = 50.dp)

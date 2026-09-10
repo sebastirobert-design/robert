@@ -264,7 +264,9 @@ fun TaBillApp(viewModel: TaBillViewModel) {
             allSchools = uiState.allSchools,
             monthYear = uiState.selectedMonthYear,
             editingEntry = uiState.editingTourEntry,
-            onSaveTour = { dayOfMonth, dateFormatted, departureStation, departureHour, destinations, arrivalHourOutbound, returnDepartureHour, returnArrivalHour, purposeOfJourney, kindOfJourney, isRoundTrip, customDistanceKm, customBusFare, remarks ->
+            existingEntries = uiState.tourEntries,
+            activeOfficerName = uiState.activeOfficer?.name ?: "",
+            onSaveTour = { dayOfMonth, dateFormatted, departureStation, departureHour, destinations, arrivalHourOutbound, returnDepartureHour, returnArrivalHour, purposeOfJourney, kindOfJourney, isRoundTrip, customDistanceKm, customBusFare, remarks, entryToReplace ->
                 viewModel.saveQuickTour(
                     dayOfMonth = dayOfMonth,
                     dateFormatted = dateFormatted,
@@ -279,7 +281,8 @@ fun TaBillApp(viewModel: TaBillViewModel) {
                     isRoundTrip = isRoundTrip,
                     customDistanceKm = customDistanceKm,
                     customBusFare = customBusFare,
-                    remarks = remarks
+                    remarks = remarks,
+                    entryToReplace = entryToReplace
                 )
             },
             onExportToCsv = { viewModel.exportToExcelGoogleSheet(context) },
