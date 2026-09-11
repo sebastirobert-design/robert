@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -47,6 +48,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -345,7 +347,7 @@ fun QuickTourEntryDialog(
 
     Dialog(
         onDismissRequest = {
-            // Intentionally empty: The window must NOT disappear until the user presses Save Tour or confirms discard.
+            // Intentionally empty: The window must NOT disappear until the user presses Save Tour or Cancel button.
         },
         properties = DialogProperties(
             dismissOnBackPress = false,
@@ -353,12 +355,21 @@ fun QuickTourEntryDialog(
             usePlatformDefaultWidth = false
         )
     ) {
+        // Prevent system back gesture or key from unexpectedly closing the dialog
+        BackHandler(enabled = true) {
+            // Stay open while editing: User must explicitly click "Save Tour" or "Cancel"
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.55f))
                 .systemBarsPadding()
-                .imePadding(),
+                .imePadding()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { /* Absorb background clicks so the dialog never closes unexpectedly */ },
             contentAlignment = Alignment.BottomCenter
         ) {
             Card(
@@ -394,7 +405,10 @@ fun QuickTourEntryDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
@@ -413,20 +427,44 @@ fun QuickTourEntryDialog(
                             Column {
                                 Text(
                                     text = if (isTamil) "புதிய பயணப் பதிவு (Less-Input Tour)" else "Quick Tour Entry",
-                                    fontSize = 17.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Navy900
+                                    color = Navy900,
+                                    maxLines = 1
                                 )
                                 Text(
                                     text = if (isTamil) "1 முறை உள்ளிட்டால் Form 1 & Form 2 தயாராகும்" else "Auto-generates Form 1 Diary & Form 2 TA Bill",
-                                    fontSize = 11.5.sp,
-                                    color = TextSecondary
+                                    fontSize = 11.sp,
+                                    color = TextSecondary,
+                                    maxLines = 1
                                 )
                             }
                         }
 
-                        IconButton(onClick = { showDiscardConfirmDialog = true }) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                        // Top Cancel / Close button
+                        FilledTonalButton(
+                            onClick = onDismiss,
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = Color(0xFFFEE2E2),
+                                contentColor = CrimsonRed
+                            ),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .height(34.dp)
+                                .testTag("header_cancel_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cancel",
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isTamil) "ரத்து" else "Cancel",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
@@ -1361,51 +1399,90 @@ fun QuickTourEntryDialog(
                 }
             }
 
-            // Save Action Button
-            Button(
-                onClick = {
-                    if (existingEntriesForDay.isNotEmpty() && currentEditingEntry == null) {
-                        showAlreadyExistsConfirmDialog = true
-                    } else {
-                        performSave()
-                    }
-                },
+            // Main Action Buttons Row: [ ரத்து செய் (Cancel) ]  [ பயணத்தை சேமிக்க (Save Tour) ]
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
-                    .testTag("save_quick_tour_btn"),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isEditingMode || currentEditingEntry != null) Navy800 else Navy700
-                )
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (isEditingMode || currentEditingEntry != null) Icons.Default.Edit else Icons.Default.Check,
-                    contentDescription = "Save"
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isEditingMode || currentEditingEntry != null) {
-                        if (isTamil) "மாற்றங்களைச் சேமிக்க (Update Tour)" else "Update Tour & Refresh Bills"
-                    } else {
-                        if (isTamil) "பயணத்தை சேமிக்க (Save Tour)" else "Save Tour & Generate Bills"
+                // 1. ரத்து செய் (Cancel Button - Discards/Closes the dialog)
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .weight(0.38f)
+                        .height(52.dp)
+                        .testTag("cancel_quick_tour_btn"),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.5.dp, CrimsonRed),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFFFFF1F2),
+                        contentColor = CrimsonRed
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cancel",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isTamil) "ரத்து செய்" else "Cancel",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+
+                // 2. பயணத்தை சேமிக்க / மாற்றங்களைச் சேமிக்க (Save Tour Button)
+                Button(
+                    onClick = {
+                        if (existingEntriesForDay.isNotEmpty() && currentEditingEntry == null) {
+                            showAlreadyExistsConfirmDialog = true
+                        } else {
+                            performSave()
+                        }
                     },
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                    modifier = Modifier
+                        .weight(0.62f)
+                        .height(52.dp)
+                        .testTag("save_quick_tour_btn"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isEditingMode || currentEditingEntry != null) Navy800 else Navy700
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isEditingMode || currentEditingEntry != null) Icons.Default.Edit else Icons.Default.Check,
+                        contentDescription = "Save",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isEditingMode || currentEditingEntry != null) {
+                            if (isTamil) "மாற்றங்களைச் சேமிக்க" else "Update Tour"
+                        } else {
+                            if (isTamil) "பயணத்தை சேமிக்க" else "Save Tour"
+                        },
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Export to Excel / Google Sheet button (BOM UTF-8 CSV)
             OutlinedButton(
                 onClick = onExportToCsv,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .height(46.dp)
                     .testTag("export_to_excel_google_sheet_btn"),
                 shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.5.dp, Color(0xFF16A34A)),
+                border = BorderStroke(1.2.dp, Color(0xFF16A34A)),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = Color(0xFFF0FDF4),
                     contentColor = Color(0xFF15803D)
@@ -1414,12 +1491,13 @@ fun QuickTourEntryDialog(
                 Icon(
                     imageVector = Icons.Default.Share,
                     contentDescription = "Export to Excel / Google Sheet",
-                    tint = Color(0xFF15803D)
+                    tint = Color(0xFF15803D),
+                    modifier = Modifier.size(17.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Export to Excel / Google Sheet",
-                    fontSize = 15.sp,
+                    text = if (isTamil) "Excel / Google Sheet-ல் ஏற்றுமதி (Export)" else "Export to Excel / Google Sheet",
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF15803D)
                 )
