@@ -40,6 +40,7 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
     private val _showQuickNonTravelDialog = MutableStateFlow<Boolean>(false)
     private val _showSchoolPickerSheet = MutableStateFlow<Boolean>(false)
     private val _editingTourEntry = MutableStateFlow<TourEntry?>(null)
+    private val _quickTourInitialMode = MutableStateFlow<String>("TOUR")
     private val _schoolSearchQuery = MutableStateFlow<String>("")
     private val _feedbackMessage = MutableStateFlow<String?>(null)
 
@@ -74,7 +75,8 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
             _showSchoolPickerSheet,
             _editingTourEntry,
             _schoolSearchQuery,
-            _feedbackMessage
+            _feedbackMessage,
+            _quickTourInitialMode
         ) { args: Array<Any?> ->
             DialogControlState(
                 selectedCalendar = args[0] as Calendar,
@@ -86,7 +88,8 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
                 showSchoolPicker = args[6] as Boolean,
                 editingEntry = args[7] as TourEntry?,
                 searchQuery = args[8] as String,
-                feedback = args[9] as String?
+                feedback = args[9] as String?,
+                quickTourInitialMode = args[10] as String
             )
         }
 
@@ -134,6 +137,7 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
                 settingsSubTab = ctrl.settingsSubTab,
                 showQuickTourDialog = ctrl.showQuickTour,
                 showQuickNonTravelDialog = ctrl.showNonTravel,
+                quickTourInitialMode = ctrl.quickTourInitialMode,
                 showSchoolPickerSheet = ctrl.showSchoolPicker,
                 editingTourEntry = ctrl.editingEntry,
                 schoolSearchQuery = ctrl.searchQuery,
@@ -214,14 +218,32 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
         _settingsSubTab.value = subTabIndex
     }
 
-    fun openQuickTourDialog(entryToEdit: TourEntry? = null) {
+    fun openQuickTourDialog(entryToEdit: TourEntry? = null, initialMode: String = "TOUR") {
         _editingTourEntry.value = entryToEdit
+        _quickTourInitialMode.value = if (entryToEdit?.isNonTravel == true) "LEAVE" else initialMode
         _showQuickTourDialog.value = true
     }
 
     fun closeQuickTourDialog() {
         _showQuickTourDialog.value = false
         _editingTourEntry.value = null
+    }
+
+    fun addNonTravelDayFromDialog(dayOfMonth: Int, dateFormatted: String, type: String, closeDialog: Boolean = false) {
+        viewModelScope.launch {
+            val state = uiState.value
+            repository.addNonTravelDay(
+                officerId = state.activeOfficer.id,
+                monthYear = state.selectedMonthYear,
+                dayOfMonth = dayOfMonth,
+                dateFormatted = dateFormatted,
+                type = type
+            )
+            if (closeDialog) {
+                closeQuickTourDialog()
+            }
+            _feedbackMessage.value = "$type ($dateFormatted) சேர்க்கப்பட்டது! (Added)"
+        }
     }
 
     fun openQuickNonTravelDialog() {
@@ -530,7 +552,8 @@ data class DialogControlState(
     val showSchoolPicker: Boolean,
     val editingEntry: TourEntry?,
     val searchQuery: String,
-    val feedback: String?
+    val feedback: String?,
+    val quickTourInitialMode: String = "TOUR"
 )
 
 data class AppFlowData(

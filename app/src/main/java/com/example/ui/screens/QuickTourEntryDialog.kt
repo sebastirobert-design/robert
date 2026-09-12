@@ -28,6 +28,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.BeachAccess
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -36,6 +38,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
@@ -88,6 +93,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.School
@@ -115,6 +121,7 @@ fun QuickTourEntryDialog(
     existingEntries: List<TourEntry> = emptyList(),
     activeOfficerName: String = "",
     activeOfficerSlot: Int = 1,
+    initialMode: String = "TOUR", // "TOUR" or "LEAVE"
     onSaveTour: (
         dayOfMonth: Int,
         dateFormatted: String,
@@ -133,6 +140,9 @@ fun QuickTourEntryDialog(
         entryToReplace: TourEntry?,
         customArrivalStation: String?
     ) -> Unit,
+    onAddNonTravel: ((dayOfMonth: Int, dateFormatted: String, type: String) -> Unit)? = null,
+    onDeleteEntry: ((TourEntry) -> Unit)? = null,
+    onUpdateSchool: ((School) -> Unit)? = null,
     onExportToCsv: () -> Unit = {},
     onDismiss: () -> Unit,
     isTamil: Boolean,
@@ -141,6 +151,7 @@ fun QuickTourEntryDialog(
 ) {
     val context = LocalContext.current
     val (year, month) = DateUtils.parseYearMonth(monthYear)
+    val daysInMonth = remember(year, month) { DateUtils.getDaysInMonth(year, month) }
     val defaultDay = (editingEntry?.dayOfMonth ?: initialDay).coerceIn(1, 31)
 
     // Form states
@@ -148,6 +159,20 @@ fun QuickTourEntryDialog(
     var isEditingMode by remember(editingEntry) { mutableStateOf(editingEntry != null) }
     var showAlreadyExistsConfirmDialog by remember { mutableStateOf(false) }
     var showDiscardConfirmDialog by remember { mutableStateOf(false) }
+
+    var entryMode by remember(editingEntry, initialMode) {
+        mutableStateOf(
+            if (editingEntry?.isNonTravel == true || initialMode == "LEAVE") "LEAVE" else "TOUR"
+        )
+    }
+    var selectedNonTravelType by remember(editingEntry) {
+        mutableStateOf(editingEntry?.nonTravelType?.ifEmpty { "தற்செயல்விடுப்பு" } ?: "தற்செயல்விடுப்பு")
+    }
+    var nonTravelReasonText by remember(editingEntry) {
+        mutableStateOf(
+            editingEntry?.purposeOfJourney ?: if (selectedNonTravelType == "தற்செயல்விடுப்பு") "தற்செயல்விடுப்பு (CL)" else "விடுமுறை"
+        )
+    }
 
     var dayOfMonth by remember { mutableIntStateOf(defaultDay) }
     var dayStr by remember { mutableStateOf(String.format(Locale.US, "%02d", defaultDay)) }
@@ -185,6 +210,7 @@ fun QuickTourEntryDialog(
 
     val selectedDestinations = remember { mutableStateListOf<School>() }
     var showSchoolPicker by remember { mutableStateOf(false) }
+    var editingDestinationSchool by remember { mutableStateOf<School?>(null) }
 
     // Town / Village Name state for arrival station (ஊரின் பெயர் மட்டும்)
     var arrivalStationTownText by remember(editingEntry) {
@@ -222,7 +248,14 @@ fun QuickTourEntryDialog(
         isEditingMode = true
         dayOfMonth = targetEntry.dayOfMonth
         dayStr = String.format(Locale.US, "%02d", targetEntry.dayOfMonth)
-        departureStation = targetEntry.departureStation.ifEmpty { "தலைமையிடம்" }
+
+        if (targetEntry.isNonTravel) {
+            entryMode = "LEAVE"
+            selectedNonTravelType = targetEntry.nonTravelType.ifEmpty { "தற்செயல்விடுப்பு" }
+            nonTravelReasonText = targetEntry.purposeOfJourney
+        } else {
+            entryMode = "TOUR"
+            departureStation = targetEntry.departureStation.ifEmpty { "தலைமையிடம்" }
         departureHour = DateUtils.formatStrictTime(targetEntry.departureHour.ifEmpty { "09:00 AM" }, "09:00 AM")
         arrivalHourOutbound = DateUtils.formatStrictTime(targetEntry.arrivalHour.ifEmpty { "09:30 AM" }, "09:30 AM")
 
@@ -273,6 +306,7 @@ fun QuickTourEntryDialog(
             selectedDestinations.joinToString(".") { it.getStationOrVillageName(isTamil) }
         } else {
             parts.joinToString(".") { School.extractVillageName(it.trim()) }
+        }
         }
     }
 
@@ -404,6 +438,35 @@ fun QuickTourEntryDialog(
             currentEditingEntry,
             finalTownStation
         )
+    }
+
+    val performSaveLeave: (Boolean) -> Unit = { advanceToNext ->
+        val dateFormatted = DateUtils.formatDate(year, month, dayOfMonth)
+        val finalReason = nonTravelReasonText.ifBlank {
+            when (selectedNonTravelType) {
+                "தற்செயல்விடுப்பு" -> "தற்செயல்விடுப்பு (CL)"
+                "விடுமுறை" -> "விடுமுறை (Holiday)"
+                else -> "அலுவலகப்பணி"
+            }
+        }
+        onAddNonTravel?.invoke(dayOfMonth, dateFormatted, finalReason)
+        if (advanceToNext) {
+            if (dayOfMonth < daysInMonth) {
+                dayOfMonth += 1
+                dayStr = String.format(Locale.US, "%02d", dayOfMonth)
+                val nextDayEntry = existingEntries.firstOrNull { it.dayOfMonth == dayOfMonth }
+                if (nextDayEntry != null) {
+                    loadExistingEntry(nextDayEntry)
+                } else {
+                    currentEditingEntry = null
+                    isEditingMode = false
+                }
+            } else {
+                onDismiss()
+            }
+        } else {
+            onDismiss()
+        }
     }
 
     Dialog(
@@ -726,6 +789,105 @@ fun QuickTourEntryDialog(
                                 }
                             }
 
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Horizontal Calendar Day Selector (1 to daysInMonth)
+                            Text(
+                                text = if (isTamil) "மாதத்தின் அனைத்து தேதிகள் (Click to Select):" else "All Days in Month:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            LazyRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                contentPadding = PaddingValues(horizontal = 2.dp)
+                            ) {
+                                items(daysInMonth) { index ->
+                                    val d = index + 1
+                                    val isSelected = d == dayOfMonth
+                                    val dayEntries = existingEntries.filter { it.dayOfMonth == d }
+                                    val hasTour = dayEntries.any { !it.isNonTravel }
+                                    val hasLeave = dayEntries.any { it.isNonTravel && it.nonTravelType == "தற்செயல்விடுப்பு" }
+                                    val hasHoliday = dayEntries.any { it.isNonTravel && (it.nonTravelType == "விடுமுறை" || it.purposeOfJourney.contains("விடுமுறை")) }
+                                    val hasDuty = dayEntries.any { it.isNonTravel && !hasLeave && !hasHoliday }
+                                    val shortDayTa = DateUtils.getDayShortNameTamil(year, month, d)
+
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = when {
+                                            isSelected -> Navy800
+                                            hasTour -> Color(0xFFF0FDF4)
+                                            hasLeave -> Color(0xFFFEF2F2)
+                                            hasHoliday -> Color(0xFFFFFBEB)
+                                            hasDuty -> Color(0xFFEFF6FF)
+                                            else -> Color(0xFFF8FAFC)
+                                        },
+                                        border = BorderStroke(
+                                            width = if (isSelected) 2.dp else 1.dp,
+                                            color = when {
+                                                isSelected -> GoldAccent
+                                                hasTour -> EmeraldGreen
+                                                hasLeave -> CrimsonRed
+                                                hasHoliday -> AmberDark
+                                                hasDuty -> BlueAccent
+                                                else -> Color(0xFFCBD5E1)
+                                            }
+                                        ),
+                                        modifier = Modifier
+                                            .width(44.dp)
+                                            .clickable {
+                                                dayOfMonth = d
+                                                dayStr = String.format(Locale.US, "%02d", d)
+                                                val existing = dayEntries.firstOrNull()
+                                                if (existing != null) {
+                                                    loadExistingEntry(existing)
+                                                } else {
+                                                    currentEditingEntry = null
+                                                    isEditingMode = false
+                                                }
+                                            }
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = "$d",
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
+                                                color = if (isSelected) Color.White else Navy900
+                                            )
+                                            Text(
+                                                text = shortDayTa,
+                                                fontSize = 9.sp,
+                                                color = if (isSelected) Color(0xFFCBD5E1) else TextSecondary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        when {
+                                                            isSelected -> GoldAccent
+                                                            hasTour -> EmeraldGreen
+                                                            hasLeave -> CrimsonRed
+                                                            hasHoliday -> AmberDark
+                                                            hasDuty -> BlueAccent
+                                                            else -> Color.Transparent
+                                                        }
+                                                    )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             // ALREADY EXISTS WARNING CARD
                             if (existingEntriesForDay.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(10.dp))
@@ -835,82 +997,474 @@ fun QuickTourEntryDialog(
 
                                         Spacer(modifier = Modifier.height(10.dp))
 
-                                        // Action Button: "விரும்பினால் edit செய்யும் வசதி"
-                                        Button(
-                                            onClick = {
-                                                loadExistingEntry(mainEntry)
-                                            },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .testTag("edit_existing_entry_btn"),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Navy800),
-                                            shape = RoundedCornerShape(8.dp)
+                                        // Action Buttons: Edit and Delete
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Edit,
-                                                contentDescription = "Edit",
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = if (isTamil) "இப்பதிவை திருத்து (Edit Existing Details)" else "Edit Existing Details",
-                                                fontSize = 12.5.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
+                                            Button(
+                                                onClick = {
+                                                    loadExistingEntry(mainEntry)
+                                                },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("edit_existing_entry_btn"),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Navy800),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Edit,
+                                                    contentDescription = "Edit",
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = if (isTamil) "திருத்துக (Edit)" else "Edit",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+
+                                            if (onDeleteEntry != null) {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        onDeleteEntry(mainEntry)
+                                                        currentEditingEntry = null
+                                                        isEditingMode = false
+                                                    },
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .testTag("delete_existing_entry_btn"),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonRed),
+                                                    border = BorderStroke(1.dp, CrimsonRed),
+                                                    shape = RoundedCornerShape(8.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "Delete",
+                                                        modifier = Modifier.size(16.dp),
+                                                        tint = CrimsonRed
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = if (isTamil) "நீக்குக (Delete)" else "Delete",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = CrimsonRed
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            AppOutlinedTextField(
-                                value = departureStation,
-                                onValueChange = { departureStation = it },
-                                label = { Text(if (isTamil) "புறப்படும் தலைமையிடம் (HQ)" else "Departure Station (HQ)") },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("tour_departure_station_input"),
-                                singleLine = true
-                            )
                         }
                     }
                 }
 
-                // 2. DESTINATION SCHOOLS SELECTION (The Magic Fast-Input Component!)
+                // 2. ENTRY TYPE SELECTION (புதிய பயணம் vs விடுமுறை / பணி)
                 item {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color.White),
                         shape = RoundedCornerShape(12.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = if (isTamil) "2. பதிவு வகை (Select Entry Type)" else "2. Select Entry Type",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Navy800
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFFF1F5F9), RoundedCornerShape(10.dp))
+                                    .padding(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+                                // 🚌 புதிய பயணம் (New Tour)
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { entryMode = "TOUR" }
+                                        .testTag("mode_tour_tab"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (entryMode == "TOUR") Navy800 else Color.Transparent,
+                                    shadowElevation = if (entryMode == "TOUR") 2.dp else 0.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DirectionsBus,
+                                            contentDescription = null,
+                                            tint = if (entryMode == "TOUR") GoldAccent else Color(0xFF64748B),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isTamil) "புதிய பயணம்" else "New Tour",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (entryMode == "TOUR") Color.White else Color(0xFF334155)
+                                        )
+                                    }
+                                }
+
+                                // 🏖️ விடுமுறை / பணி (Leave / Holiday)
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { entryMode = "LEAVE" }
+                                        .testTag("mode_leave_tab"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (entryMode == "LEAVE") CrimsonRed else Color.Transparent,
+                                    shadowElevation = if (entryMode == "LEAVE") 2.dp else 0.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.BeachAccess,
+                                            contentDescription = null,
+                                            tint = if (entryMode == "LEAVE") Color.White else Color(0xFF64748B),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isTamil) "விடுமுறை / பணி" else "Leave / Holiday",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (entryMode == "LEAVE") Color.White else Color(0xFF334155)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. LEAVE / HOLIDAY FORM (When "விடுமுறை / பணி" mode is selected)
+                if (entryMode == "LEAVE") {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.EventBusy,
+                                            contentDescription = null,
+                                            tint = CrimsonRed,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isTamil) "விடுமுறை / பணி வகை தேர்வு" else "Select Leave / Duty Type",
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Navy900
+                                        )
+                                    }
+
+                                    val curDateStr = DateUtils.formatDate(year, month, dayOfMonth)
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Color(0xFFF1F5F9)
+                                    ) {
+                                        Text(
+                                            text = curDateStr,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Navy800,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // 3 Main Type Options as selectable Cards
+                                val leaveTypes = listOf(
+                                    Triple("தற்செயல்விடுப்பு", if (isTamil) "தற்செயல் விடுப்பு (CL)" else "Casual Leave (CL)", CrimsonRed),
+                                    Triple("விடுமுறை", if (isTamil) "பொது விடுமுறை / ஞாயிறு" else "Holiday / Weekend", AmberDark),
+                                    Triple("அலுவலகப்பணி", if (isTamil) "தலைமையிட அலுவலகப்பணி" else "HQ Office Duty", BlueAccent)
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    leaveTypes.forEach { (typeKey, label, color) ->
+                                        val isSelected = selectedNonTravelType == typeKey
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable {
+                                                    selectedNonTravelType = typeKey
+                                                    if (typeKey == "தற்செயல்விடுப்பு") nonTravelReasonText = "தற்செயல்விடுப்பு (CL)"
+                                                    else if (typeKey == "விடுமுறை") nonTravelReasonText = "விடுமுறை (Holiday)"
+                                                    else if (typeKey == "அலுவலகப்பணி") nonTravelReasonText = "அலுவலகப்பணி"
+                                                },
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isSelected) color.copy(alpha = 0.12f) else Color(0xFFF8FAFC),
+                                            border = BorderStroke(
+                                                width = if (isSelected) 2.dp else 1.dp,
+                                                color = if (isSelected) color else Color(0xFFCBD5E1)
+                                            )
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clip(CircleShape)
+                                                        .background(if (isSelected) color else Color(0xFFE2E8F0)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = when (typeKey) {
+                                                            "தற்செயல்விடுப்பு" -> Icons.Default.EventBusy
+                                                            "விடுமுறை" -> Icons.Default.BeachAccess
+                                                            else -> Icons.Default.Business
+                                                        },
+                                                        contentDescription = null,
+                                                        tint = if (isSelected) Color.White else Color(0xFF64748B),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) color else Color(0xFF334155),
+                                                    textAlign = TextAlign.Center,
+                                                    maxLines = 2
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Fast Preset Reason Chips
                                 Text(
-                                    text = if (isTamil) "2. செல்லும் பள்ளி / இடம் (Destination)" else "2. Destination School / Place",
+                                    text = if (isTamil) "விரைவு காரணங்கள் (Quick Presets):" else "Quick Presets:",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val presets = listOf(
+                                        "ஞாயிற்றுக்கிழமை" to "விடுமுறை",
+                                        "2-வது சனிக்கிழமை" to "விடுமுறை",
+                                        "அரசு விடுமுறை" to "விடுமுறை",
+                                        "தற்செயல் விடுப்பு (CL)" to "தற்செயல்விடுப்பு",
+                                        "BEO அலுவலக பணி" to "அலுவலகப்பணி",
+                                        "வட்டார வள மையப் பயிற்சி" to "அலுவலகப்பணி",
+                                        "நீதிமன்ற பணி (Court OD)" to "அலுவலகப்பணி"
+                                    )
+                                    presets.forEach { (presetLabel, matchingType) ->
+                                        val isChipActive = nonTravelReasonText == presetLabel
+                                        Surface(
+                                            shape = RoundedCornerShape(16.dp),
+                                            color = if (isChipActive) Navy700 else Color(0xFFF1F5F9),
+                                            border = BorderStroke(1.dp, if (isChipActive) Navy700 else Color(0xFFE2E8F0)),
+                                            modifier = Modifier.clickable {
+                                                nonTravelReasonText = presetLabel
+                                                selectedNonTravelType = matchingType
+                                            }
+                                        ) {
+                                            Text(
+                                                text = presetLabel,
+                                                fontSize = 11.sp,
+                                                color = if (isChipActive) Color.White else Color(0xFF334155),
+                                                fontWeight = if (isChipActive) FontWeight.Bold else FontWeight.Normal,
+                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                AppOutlinedTextField(
+                                    value = nonTravelReasonText,
+                                    onValueChange = { nonTravelReasonText = it },
+                                    label = { Text(if (isTamil) "காரணம் / விவரிப்பு (Reason / Description)" else "Reason / Description") },
+                                    placeholder = { Text(if (isTamil) "எ.கா: ஞாயிற்றுக்கிழமை / CL" else "e.g., Sunday / CL") },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("non_travel_reason_input"),
+                                    singleLine = true
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Information Card
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFFF0FDF4),
+                                    border = BorderStroke(1.dp, Color(0xFFBBF7D0)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = EmeraldGreen,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = if (isTamil) {
+                                                "படிவம் 1 பயணக் குறிப்பேட்டில் இப்பதிவு '$nonTravelReasonText' என்று பதிவாகும். TA பில்லில் கட்டணம் சேராது."
+                                            } else {
+                                                "Recorded as '$nonTravelReasonText' in Form 1 Diary. Excluded from TA travel claims."
+                                            },
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF166534),
+                                            lineHeight = 15.sp
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Action Buttons for Save Leave / Holiday
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { performSaveLeave(true) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(46.dp)
+                                            .testTag("save_and_next_day_leave_btn"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen)
+                                    ) {
+                                        Icon(imageVector = Icons.Default.FastForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = if (isTamil) "சேமித்து அடுத்த நாள் ➔" else "Save & Next ➔",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = { performSaveLeave(false) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(46.dp)
+                                            .testTag("save_leave_btn"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = when (selectedNonTravelType) {
+                                                "தற்செயல்விடுப்பு" -> CrimsonRed
+                                                "விடுமுறை" -> AmberDark
+                                                else -> BlueAccent
+                                            }
+                                        )
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = if (isTamil) "விடுமுறை சேமிக்க" else "Save Leave",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 4. TOUR FORM SECTIONS (When "புதிய பயணம்" mode is selected)
+                if (entryMode == "TOUR") {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = if (isTamil) "3. செல்லும் பள்ளி / இடம் (Destination)" else "3. Destination School / Place",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Navy800
                                 )
-                                Button(
-                                    onClick = { showSchoolPicker = true },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Navy700),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.testTag("select_school_btn")
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                AppOutlinedTextField(
+                                    value = departureStation,
+                                    onValueChange = { departureStation = it },
+                                    label = { Text(if (isTamil) "புறப்படும் தலைமையிடம் (HQ)" else "Departure Station (HQ)") },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("tour_departure_station_input"),
+                                    singleLine = true
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.School,
-                                        contentDescription = "Pick School",
-                                        modifier = Modifier.size(16.dp)
+                                    Text(
+                                        text = if (isTamil) "சென்றடையும் ஊர் தேர்வு:" else "Destination Town Selection:",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Navy800
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (isTamil) "பள்ளி தேர்வு (119)" else "Pick School", fontSize = 12.sp)
+                                    Button(
+                                        onClick = { showSchoolPicker = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Navy700),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.testTag("select_school_btn")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Place,
+                                            contentDescription = "Pick Town",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(if (isTamil) "ஊர் தேர்வு (119)" else "Pick Town (119)", fontSize = 12.sp)
+                                    }
                                 }
-                            }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
@@ -934,7 +1488,7 @@ fun QuickTourEntryDialog(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = if (isTamil) "இங்கு தொட்டு பள்ளியைத் தேர்ந்தெடுக்கவும் (119 பள்ளிகள் உள்ளன)" else "Tap to choose destination school (119 available)",
+                                            text = if (isTamil) "இங்கு தொட்டு சென்றடையும் ஊரைத் தேர்ந்தெடுக்கவும் (119 ஊர்கள் உள்ளன)" else "Tap to choose destination town (119 available)",
                                             fontSize = 12.5.sp,
                                             color = Color(0xFFE65100),
                                             fontWeight = FontWeight.Medium
@@ -990,11 +1544,6 @@ fun QuickTourEntryDialog(
                                                             }
                                                         }
                                                         Text(
-                                                            text = if (isTamil && school.nameTa.isNotEmpty()) school.nameTa else school.nameEn,
-                                                            fontSize = 11.5.sp,
-                                                            color = TextSecondary
-                                                        )
-                                                        Text(
                                                             text = "${school.distanceFromHqKm} km • ₹${school.defaultBusFare} bus fare",
                                                             fontSize = 11.sp,
                                                             color = TextSecondary
@@ -1002,16 +1551,32 @@ fun QuickTourEntryDialog(
                                                     }
                                                 }
 
-                                                IconButton(
-                                                    onClick = { selectedDestinations.removeAt(index) },
-                                                    modifier = Modifier.size(28.dp)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Close,
-                                                        contentDescription = "Remove",
-                                                        tint = Color.Red,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
+                                                    IconButton(
+                                                        onClick = { editingDestinationSchool = school },
+                                                        modifier = Modifier.size(28.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Edit,
+                                                            contentDescription = "Edit Town Name",
+                                                            tint = BlueAccent,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+                                                    IconButton(
+                                                        onClick = { selectedDestinations.removeAt(index) },
+                                                        modifier = Modifier.size(28.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Close,
+                                                            contentDescription = "Remove",
+                                                            tint = Color.Red,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -1027,7 +1592,7 @@ fun QuickTourEntryDialog(
                                     ) {
                                         Icon(imageVector = Icons.Default.Add, contentDescription = "Add More")
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text(if (isTamil) "+ அடுத்த பள்ளி சேர்க்க (Add Multi-School Tour)" else "+ Add Another Destination")
+                                        Text(if (isTamil) "+ அடுத்த ஊர் சேர்க்க (Add Destination Town)" else "+ Add Another Destination")
                                     }
                                 }
                             }
@@ -1525,6 +2090,7 @@ fun QuickTourEntryDialog(
                     }
                 }
             }
+        }
 
             // Main Action Buttons Row: [ ரத்து செய் (Cancel) ]  [ பயணத்தை சேமிக்க (Save Tour) ]
             Row(
@@ -1562,13 +2128,17 @@ fun QuickTourEntryDialog(
                     )
                 }
 
-                // 2. பயணத்தை சேமிக்க / மாற்றங்களைச் சேமிக்க (Save Tour Button)
+                // 2. பயணத்தை சேமிக்க / விடுமுறை சேமிக்க (Save Button)
                 Button(
                     onClick = {
-                        if (existingEntriesForDay.isNotEmpty() && currentEditingEntry == null) {
-                            showAlreadyExistsConfirmDialog = true
+                        if (entryMode == "LEAVE") {
+                            performSaveLeave(false)
                         } else {
-                            performSave()
+                            if (existingEntriesForDay.isNotEmpty() && currentEditingEntry == null) {
+                                showAlreadyExistsConfirmDialog = true
+                            } else {
+                                performSave()
+                            }
                         }
                     },
                     modifier = Modifier
@@ -1577,17 +2147,33 @@ fun QuickTourEntryDialog(
                         .testTag("save_quick_tour_btn"),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isEditingMode || currentEditingEntry != null) Navy800 else Navy700
+                        containerColor = if (entryMode == "LEAVE") {
+                            when (selectedNonTravelType) {
+                                "தற்செயல்விடுப்பு" -> CrimsonRed
+                                "விடுமுறை" -> AmberDark
+                                else -> BlueAccent
+                            }
+                        } else {
+                            if (isEditingMode || currentEditingEntry != null) Navy800 else Navy700
+                        }
                     )
                 ) {
                     Icon(
-                        imageVector = if (isEditingMode || currentEditingEntry != null) Icons.Default.Edit else Icons.Default.Check,
+                        imageVector = if (entryMode == "LEAVE") {
+                            Icons.Default.Check
+                        } else if (isEditingMode || currentEditingEntry != null) {
+                            Icons.Default.Edit
+                        } else {
+                            Icons.Default.Check
+                        },
                         contentDescription = "Save",
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isEditingMode || currentEditingEntry != null) {
+                        text = if (entryMode == "LEAVE") {
+                            if (isTamil) "விடுமுறை சேமிக்க" else "Save Leave"
+                        } else if (isEditingMode || currentEditingEntry != null) {
                             if (isTamil) "மாற்றங்களைச் சேமிக்க" else "Update Tour"
                         } else {
                             if (isTamil) "பயணத்தை சேமிக்க" else "Save Tour"
@@ -1717,7 +2303,106 @@ fun QuickTourEntryDialog(
             onConfirmSelection = { showSchoolPicker = false },
             onDismiss = { showSchoolPicker = false },
             isTamil = isTamil,
-            isMultiSelect = true
+            isMultiSelect = true,
+            onUpdateSchool = { updatedSchool ->
+                onUpdateSchool?.invoke(updatedSchool)
+                val idx = selectedDestinations.indexOfFirst { it.id == updatedSchool.id }
+                if (idx >= 0) {
+                    selectedDestinations[idx] = updatedSchool
+                }
+                arrivalStationTownText = selectedDestinations.joinToString(".") { it.getStationOrVillageName(isTamil) }
+            }
+        )
+    }
+
+    // Dialog to edit destination school town name
+    if (editingDestinationSchool != null) {
+        val dest = editingDestinationSchool!!
+        var editVillageTa by remember(dest) {
+            mutableStateOf(dest.villageTa.ifEmpty { dest.getStationOrVillageName(true) })
+        }
+        var editVillageEn by remember(dest) {
+            mutableStateOf(dest.villageEn.ifEmpty { dest.getStationOrVillageName(false) })
+        }
+
+        AlertDialog(
+            onDismissRequest = { editingDestinationSchool = null },
+            title = {
+                Text(
+                    text = if (isTamil) "ஊர் பெயர் திருத்துக" else "Edit Town Name",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = Navy900
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = if (isTamil) "ஊரின் பெயர் தமிழில் (Town Name)" else "Town Name in Tamil",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF166534)
+                            )
+                            Text(
+                                text = if (isTamil) "பயண பதிவில் பள்ளியின் பெயர் வராமல் இந்த ஊரின் பெயர் மட்டுமே பதிவாகும்." else "Only this town name appears in tour entries (no school name).",
+                                fontSize = 11.sp,
+                                color = Color(0xFF15803D)
+                            )
+                            AppOutlinedTextField(
+                                value = editVillageTa,
+                                onValueChange = { editVillageTa = it },
+                                label = { Text(if (isTamil) "ஊரின் பெயர் (எ.கா. சேதுராணி, சாலையூர்)" else "Town Name in Tamil") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("edit_dest_village_ta_field")
+                            )
+                        }
+                    }
+
+                    AppOutlinedTextField(
+                        value = editVillageEn,
+                        onValueChange = { editVillageEn = it },
+                        label = { Text(if (isTamil) "ஊரின் பெயர் ஆங்கிலத்தில்" else "Town Name in English") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("edit_dest_village_en_field")
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = dest.copy(
+                            villageTa = editVillageTa.trim(),
+                            villageEn = editVillageEn.trim()
+                        )
+                        onUpdateSchool?.invoke(updated)
+                        val idx = selectedDestinations.indexOfFirst { it.id == updated.id }
+                        if (idx >= 0) {
+                            selectedDestinations[idx] = updated
+                        }
+                        arrivalStationTownText = selectedDestinations.joinToString(".") { it.getStationOrVillageName(isTamil) }
+                        editingDestinationSchool = null
+                    },
+                    modifier = Modifier.testTag("save_dest_school_edit_btn")
+                ) {
+                    Text(if (isTamil) "சேமிக்க (Save)" else "Save")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { editingDestinationSchool = null },
+                    modifier = Modifier.testTag("cancel_dest_school_edit_btn")
+                ) {
+                    Text(if (isTamil) "ரத்து செய்" else "Cancel")
+                }
+            }
         )
     }
 

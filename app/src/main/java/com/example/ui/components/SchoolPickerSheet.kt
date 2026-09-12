@@ -53,6 +53,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.text.input.KeyboardType
 import com.example.data.model.School
 import com.example.ui.theme.BlueAccent
 import com.example.ui.theme.EmeraldGreen
@@ -73,10 +80,12 @@ fun SchoolPickerSheet(
     isTamil: Boolean,
     isMultiSelect: Boolean = false,
     initialCategory: String = "ALL",
+    onUpdateSchool: ((School) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(initialCategory) }
+    var schoolToEdit by remember { mutableStateOf<School?>(null) }
 
     val categories = listOf(
         "ALL" to if (isTamil) "அனைத்தும் (119)" else "All (119)",
@@ -353,37 +362,58 @@ fun SchoolPickerSheet(
                                 }
                             }
 
-                            // Distance & Fare Badge
-                            Column(horizontalAlignment = Alignment.End) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color(0xFFFFF8E1)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                // Distance & Fare Badge
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Color(0xFFFFF8E1)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Place,
-                                            contentDescription = "Distance",
-                                            tint = Color(0xFFE65100),
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(2.dp))
-                                        Text(
-                                            text = "${school.distanceFromHqKm} km",
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFFE65100)
-                                        )
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Place,
+                                                contentDescription = "Distance",
+                                                tint = Color(0xFFE65100),
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Text(
+                                                text = "${school.distanceFromHqKm} km",
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFE65100)
+                                            )
+                                        }
                                     }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "₹${school.defaultBusFare} fare",
+                                        fontSize = 10.5.sp,
+                                        color = TextSecondary
+                                    )
                                 }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "₹${school.defaultBusFare} fare",
-                                    fontSize = 10.5.sp,
-                                    color = TextSecondary
-                                )
+
+                                // Edit button for this school to correct Tamil town spelling errors
+                                IconButton(
+                                    onClick = { schoolToEdit = school },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(Color(0xFFEFF6FF), CircleShape)
+                                        .testTag("edit_school_picker_${school.serialNo}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = if (isTamil) "ஊர் பெயர் திருத்துக" else "Edit Town Name",
+                                        tint = BlueAccent,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -392,4 +422,133 @@ fun SchoolPickerSheet(
         }
     }
 }
+
+    // Dialog to edit school and correct Tamil town name spelling mistakes
+    if (schoolToEdit != null) {
+        val editing = schoolToEdit!!
+        var editVillageTa by remember(editing) {
+            mutableStateOf(editing.villageTa.ifEmpty { editing.getStationOrVillageName(true) })
+        }
+        var editVillageEn by remember(editing) {
+            mutableStateOf(editing.villageEn.ifEmpty { editing.getStationOrVillageName(false) })
+        }
+        var editNameTa by remember(editing) { mutableStateOf(editing.nameTa) }
+        var editNameEn by remember(editing) { mutableStateOf(editing.nameEn) }
+        var editDistance by remember(editing) { mutableStateOf(editing.distanceFromHqKm.toString()) }
+        var editFare by remember(editing) { mutableStateOf(editing.defaultBusFare.toString()) }
+
+        AlertDialog(
+            onDismissRequest = { schoolToEdit = null },
+            title = {
+                Text(
+                    text = if (isTamil) "ஊர் & பள்ளி பெயர் திருத்துக" else "Edit Town & School Name",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    color = Navy900
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                text = if (isTamil) "ஊரின் பெயர் தமிழில் (Town Name - TA Bill)" else "Town Name in Tamil",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF166534)
+                            )
+                            Text(
+                                text = if (isTamil) "தமிழில் எழுத்துப்பிழைகளை இங்கு திருத்திக் கொள்ளலாம். இப்பெயர் மட்டுமே பயணப் பதிவில் தோன்றும்." else "Correct Tamil spelling errors here. Only this town name appears in tour entries.",
+                                fontSize = 11.sp,
+                                color = Color(0xFF15803D)
+                            )
+                            AppOutlinedTextField(
+                                value = editVillageTa,
+                                onValueChange = { editVillageTa = it },
+                                label = { Text(if (isTamil) "ஊரின் பெயர் (எ.கா. சேதுராணி, சாலையூர்)" else "Town Name in Tamil") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("edit_picker_village_ta_field")
+                            )
+                        }
+                    }
+
+                    AppOutlinedTextField(
+                        value = editVillageEn,
+                        onValueChange = { editVillageEn = it },
+                        label = { Text(if (isTamil) "ஊரின் பெயர் ஆங்கிலத்தில் (Town Name EN)" else "Town Name English") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("edit_picker_village_en_field")
+                    )
+
+                    AppOutlinedTextField(
+                        value = editNameTa,
+                        onValueChange = { editNameTa = it },
+                        label = { Text(if (isTamil) "பள்ளியின் பெயர் (School Name TA)" else "School Name Tamil") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("edit_picker_name_ta_field")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AppOutlinedTextField(
+                            value = editDistance,
+                            onValueChange = { editDistance = it },
+                            label = { Text(if (isTamil) "தொலைவு கி.மீ" else "Distance KM") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("edit_picker_dist_field")
+                        )
+                        AppOutlinedTextField(
+                            value = editFare,
+                            onValueChange = { editFare = it },
+                            label = { Text(if (isTamil) "கட்டணம் ₹" else "Fare ₹") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("edit_picker_fare_field")
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = editing.copy(
+                            villageTa = editVillageTa.trim(),
+                            villageEn = editVillageEn.trim(),
+                            nameTa = editNameTa.trim(),
+                            distanceFromHqKm = editDistance.toIntOrNull() ?: editing.distanceFromHqKm,
+                            defaultBusFare = editFare.toIntOrNull() ?: editing.defaultBusFare
+                        )
+                        onUpdateSchool?.invoke(updated)
+                        schoolToEdit = null
+                    },
+                    modifier = Modifier.testTag("save_picker_school_edit_btn")
+                ) {
+                    Text(if (isTamil) "சேமிக்க (Save)" else "Save")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { schoolToEdit = null },
+                    modifier = Modifier.testTag("cancel_picker_school_edit_btn")
+                ) {
+                    Text(if (isTamil) "ரத்து செய்" else "Cancel")
+                }
+            }
+        )
+    }
 }

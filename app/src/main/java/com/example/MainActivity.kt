@@ -267,6 +267,7 @@ fun TaBillApp(viewModel: TaBillViewModel) {
             existingEntries = uiState.tourEntries,
             activeOfficerName = uiState.activeOfficer?.name ?: "",
             activeOfficerSlot = uiState.activeOfficer?.officerSlot ?: 1,
+            initialMode = uiState.quickTourInitialMode,
             onSaveTour = { dayOfMonth, dateFormatted, departureStation, departureHour, destinations, arrivalHourOutbound, returnDepartureHour, returnArrivalHour, purposeOfJourney, kindOfJourney, isRoundTrip, customDistanceKm, customBusFare, remarks, entryToReplace, customArrivalStation ->
                 viewModel.saveQuickTour(
                     dayOfMonth = dayOfMonth,
@@ -286,6 +287,15 @@ fun TaBillApp(viewModel: TaBillViewModel) {
                     entryToReplace = entryToReplace,
                     customArrivalStation = customArrivalStation
                 )
+            },
+            onAddNonTravel = { dayOfMonth, dateFormatted, type ->
+                viewModel.addNonTravelDayFromDialog(dayOfMonth, dateFormatted, type)
+            },
+            onDeleteEntry = { entry ->
+                viewModel.deleteTourEntry(entry)
+            },
+            onUpdateSchool = { school ->
+                viewModel.saveSchool(school)
             },
             onExportToCsv = { viewModel.exportToExcelGoogleSheet(context) },
             onDismiss = { viewModel.closeQuickTourDialog() },

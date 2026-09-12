@@ -22,6 +22,7 @@ data class TaBillUiState(
     val isLoading: Boolean = false,
     val showQuickTourDialog: Boolean = false,
     val showQuickNonTravelDialog: Boolean = false,
+    val quickTourInitialMode: String = "TOUR", // "TOUR" or "LEAVE"
     val showSchoolPickerSheet: Boolean = false,
     val editingTourEntry: TourEntry? = null,
     val schoolSearchQuery: String = "",

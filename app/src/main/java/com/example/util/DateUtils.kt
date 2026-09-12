@@ -28,6 +28,8 @@ object DateUtils {
         "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
     )
 
+    val shortDayNamesTamil = listOf("ஞா", "தி", "செ", "பு", "வி", "வெ", "ச")
+
     val monthNamesEnglish = listOf(
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
@@ -90,6 +92,32 @@ object DateUtils {
             Pair(y, m)
         } catch (e: Exception) {
             Pair(2026, 7)
+        }
+    }
+
+    fun getDaysInMonth(year: Int, month: Int): Int {
+        return try {
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.YEAR, year)
+            cal.set(Calendar.MONTH, month - 1)
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+            cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        } catch (e: Exception) {
+            31
+        }
+    }
+
+    fun getDayShortNameTamil(year: Int, month: Int, day: Int): String {
+        return try {
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.YEAR, year)
+            cal.set(Calendar.MONTH, month - 1)
+            cal.set(Calendar.DAY_OF_MONTH, day)
+            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+            val index = (dayOfWeek - 1).coerceIn(0, 6)
+            shortDayNamesTamil[index]
+        } catch (e: Exception) {
+            ""
         }
     }
 
