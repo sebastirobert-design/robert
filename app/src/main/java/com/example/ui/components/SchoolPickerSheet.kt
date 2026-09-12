@@ -72,17 +72,17 @@ fun SchoolPickerSheet(
     onDismiss: () -> Unit,
     isTamil: Boolean,
     isMultiSelect: Boolean = false,
+    initialCategory: String = "ALL",
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("ALL") }
+    var selectedCategory by remember { mutableStateOf(initialCategory) }
 
     val categories = listOf(
         "ALL" to if (isTamil) "அனைத்தும் (119)" else "All (119)",
-        "PUPS" to if (isTamil) "தொடக்கப்பள்ளி (PUPS)" else "Primary (PUPS)",
-        "PUMS" to if (isTamil) "நடுநிலைப்பள்ளி (PUMS)" else "Middle (PUMS)",
-        "AIDED_PRIMARY" to if (isTamil) "உதவி தொடக்கப்பள்ளி" else "Aided Primary",
-        "AIDED_MIDDLE" to if (isTamil) "உதவி நடுநிலைப்பள்ளி" else "Aided Middle",
+        "BEO_I" to if (isTamil) "BEO I (35 பள்ளிகள்)" else "BEO I (35 Schools)",
+        "BEO_II" to if (isTamil) "BEO II (47 பள்ளிகள்)" else "BEO II (47 Schools)",
+        "BEO_III" to if (isTamil) "BEO III (37 பள்ளிகள்)" else "BEO III (37 Schools)",
         "OTHER" to if (isTamil) "அலுவலகம் / நீதிமன்றம்" else "Offices / Court"
     )
 
@@ -279,19 +279,76 @@ fun SchoolPickerSheet(
 
                                 Spacer(modifier = Modifier.width(10.dp))
 
-                                Column {
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    val townName = school.getStationOrVillageName(isTamil)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = townName,
+                                            fontSize = 14.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Navy900
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = Color(0xFFE8F5E9)
+                                        ) {
+                                            Text(
+                                                text = if (isTamil) "ஊர்" else "Town",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF2E7D32),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+
                                     Text(
                                         text = if (isTamil && school.nameTa.isNotEmpty()) school.nameTa else school.nameEn,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
+                                        fontSize = 12.sp,
+                                        color = TextSecondary,
+                                        modifier = Modifier.padding(top = 1.dp)
                                     )
-                                    if (isTamil && school.nameTa.isNotEmpty()) {
+                                    if (isTamil && school.nameTa.isNotEmpty() && school.nameEn.isNotEmpty()) {
                                         Text(
                                             text = school.nameEn,
-                                            fontSize = 11.sp,
-                                            color = TextSecondary
+                                            fontSize = 10.5.sp,
+                                            color = Color(0xFF94A3B8)
                                         )
+                                    }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.padding(top = 3.dp)
+                                    ) {
+                                        val (catLabel, catBg, catColor) = when (school.category) {
+                                            "BEO_I" -> Triple("BEO I", Color(0xFFE8EAF6), Color(0xFF1A237E))
+                                            "BEO_II" -> Triple("BEO II", Color(0xFFE0F2F1), Color(0xFF004D40))
+                                            "BEO_III" -> Triple("BEO III", Color(0xFFEDE7F6), Color(0xFF4A148C))
+                                            else -> Triple(if (isTamil) "அலுவலகம்" else "Office/Court", Color(0xFFFFF3E0), Color(0xFFE65100))
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = catBg
+                                        ) {
+                                            Text(
+                                                text = catLabel,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = catColor,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                            )
+                                        }
+
+                                        if (school.code.isNotEmpty()) {
+                                            Text(
+                                                text = "UDISE: ${school.code}",
+                                                fontSize = 10.sp,
+                                                color = TextSecondary
+                                            )
+                                        }
                                     }
                                 }
                             }

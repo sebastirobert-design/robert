@@ -2,7 +2,13 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledTonalButton
+import com.example.ui.theme.EmeraldGreen
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -78,10 +84,9 @@ fun SchoolDirectoryScreen(
 
     val categories = listOf(
         "ALL" to if (isTa) "அனைத்தும் (119)" else "All (119)",
-        "PUPS" to if (isTa) "தொடக்கப்பள்ளி (PUPS)" else "Primary (PUPS)",
-        "PUMS" to if (isTa) "நடுநிலைப்பள்ளி (PUMS)" else "Middle (PUMS)",
-        "AIDED_PRIMARY" to if (isTa) "உதவி தொடக்கப்பள்ளி" else "Aided Primary",
-        "AIDED_MIDDLE" to if (isTa) "உதவி நடுநிலைப்பள்ளி" else "Aided Middle",
+        "BEO_I" to if (isTa) "BEO I (35)" else "BEO I (35)",
+        "BEO_II" to if (isTa) "BEO II (47)" else "BEO II (47)",
+        "BEO_III" to if (isTa) "BEO III (37)" else "BEO III (37)",
         "OTHER" to if (isTa) "அலுவலகம் / நீதிமன்றம்" else "Offices / Court"
     )
 
@@ -91,6 +96,7 @@ fun SchoolDirectoryScreen(
         val matchesQuery = if (q.isEmpty()) true else {
             school.nameEn.lowercase().contains(q) ||
             school.nameTa.contains(q) ||
+            school.code.lowercase().contains(q) ||
             school.serialNo.toString() == q
         }
         matchesCategory && matchesQuery
@@ -201,24 +207,86 @@ fun SchoolDirectoryScreen(
 
                                 Spacer(modifier = Modifier.width(10.dp))
 
-                                Column {
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    // Town / Village Name prominently displayed
+                                    val townName = school.getStationOrVillageName(isTa)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = townName,
+                                            fontSize = 14.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Navy900
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = Color(0xFFE8F5E9)
+                                        ) {
+                                            Text(
+                                                text = if (isTa) "ஊர்" else "Town",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF2E7D32),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Full School Name
                                     Text(
                                         text = if (isTa && school.nameTa.isNotEmpty()) school.nameTa else school.nameEn,
-                                        fontSize = 13.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
+                                        fontSize = 12.sp,
+                                        color = TextSecondary,
+                                        modifier = Modifier.padding(top = 1.dp)
                                     )
-                                    if (isTa && school.nameTa.isNotEmpty()) {
+                                    if (isTa && school.nameTa.isNotEmpty() && school.nameEn.isNotEmpty()) {
                                         Text(
                                             text = school.nameEn,
-                                            fontSize = 11.sp,
-                                            color = TextSecondary
+                                            fontSize = 10.5.sp,
+                                            color = Color(0xFF94A3B8)
                                         )
+                                    }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.padding(top = 3.dp)
+                                    ) {
+                                        val (catLabel, catBg, catColor) = when (school.category) {
+                                            "BEO_I" -> Triple("BEO I", Color(0xFFE8EAF6), Color(0xFF1A237E))
+                                            "BEO_II" -> Triple("BEO II", Color(0xFFE0F2F1), Color(0xFF004D40))
+                                            "BEO_III" -> Triple("BEO III", Color(0xFFEDE7F6), Color(0xFF4A148C))
+                                            else -> Triple(if (isTa) "அலுவலகம்" else "Office/Court", Color(0xFFFFF3E0), Color(0xFFE65100))
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = catBg
+                                        ) {
+                                            Text(
+                                                text = catLabel,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = catColor,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                            )
+                                        }
+
+                                        if (school.code.isNotEmpty()) {
+                                            Text(
+                                                text = "UDISE: ${school.code}",
+                                                fontSize = 10.sp,
+                                                color = TextSecondary
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = Color(0xFFFFF8E1)
@@ -232,14 +300,28 @@ fun SchoolDirectoryScreen(
                                     )
                                 }
 
-                                IconButton(
+                                FilledTonalButton(
                                     onClick = {
                                         editingSchool = school
                                         showAddEditDialog = true
                                     },
-                                    modifier = Modifier.size(28.dp)
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .defaultMinSize(minWidth = 48.dp, minHeight = 40.dp)
+                                        .testTag("edit_school_btn_${school.serialNo}")
                                 ) {
-                                    Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (isTa) "திருத்து" else "Edit",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
@@ -267,8 +349,16 @@ fun SchoolDirectoryScreen(
 
     // Add / Edit School Dialog
     if (showAddEditDialog) {
+        var villageTa by remember {
+            mutableStateOf(editingSchool?.villageTa?.ifEmpty { editingSchool?.getStationOrVillageName(true) } ?: "")
+        }
+        var villageEn by remember {
+            mutableStateOf(editingSchool?.villageEn?.ifEmpty { editingSchool?.getStationOrVillageName(false) } ?: "")
+        }
         var nameTa by remember { mutableStateOf(editingSchool?.nameTa ?: "") }
         var nameEn by remember { mutableStateOf(editingSchool?.nameEn ?: "") }
+        var code by remember { mutableStateOf(editingSchool?.code ?: "") }
+        var category by remember { mutableStateOf(editingSchool?.category ?: "BEO_I") }
         var distanceKm by remember { mutableStateOf(editingSchool?.distanceFromHqKm?.toString() ?: "15") }
         var busFare by remember { mutableStateOf(editingSchool?.defaultBusFare?.toString() ?: "15") }
 
@@ -276,24 +366,103 @@ fun SchoolDirectoryScreen(
             onDismissRequest = { showAddEditDialog = false },
             title = {
                 Text(
-                    text = if (editingSchool != null) "பள்ளி விவரம் திருத்துக" else "புதிய பள்ளி சேர்க்க",
-                    fontWeight = FontWeight.Bold
+                    text = if (editingSchool != null) "பள்ளி & ஊர் பெயர் திருத்துக (Edit School & Town)" else "புதிய பள்ளி சேர்க்க (Add School)",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
+                    // Town / Village Name - Primary request: fix Tamil town spelling mistakes
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Place,
+                                    contentDescription = null,
+                                    tint = EmeraldGreen,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "ஊரின் பெயர் (Town Name - TA Bill & Diary)",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF166534)
+                                )
+                            }
+                            Text(
+                                text = "பயண பதிவில் பள்ளியின் பெயர் வராமல் இந்த ஊரின் பெயர் மட்டுமே பதிவாகும்.",
+                                fontSize = 11.sp,
+                                color = Color(0xFF15803D)
+                            )
+                            AppOutlinedTextField(
+                                value = villageTa,
+                                onValueChange = { villageTa = it },
+                                label = { Text("ஊரின் பெயர் தமிழில் (Town/Village)") },
+                                placeholder = { Text("எ.கா. சேதுராணி, சாலையூர், சிவகங்கை") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("edit_village_ta_field")
+                            )
+                        }
+                    }
+
                     AppOutlinedTextField(
                         value = nameTa,
-                        onValueChange = { nameTa = it },
-                        label = { Text("பள்ளி பெயர் (தமிழ்)") },
-                        modifier = Modifier.fillMaxWidth()
+                        onValueChange = {
+                            nameTa = it
+                            if (villageTa.isBlank()) {
+                                villageTa = School.extractVillageName(it)
+                            }
+                        },
+                        label = { Text("பள்ளியின் முழு பெயர் தமிழில் (School Full Name)") },
+                        modifier = Modifier.fillMaxWidth().testTag("edit_school_name_ta_field")
                     )
                     AppOutlinedTextField(
                         value = nameEn,
-                        onValueChange = { nameEn = it },
+                        onValueChange = {
+                            nameEn = it
+                            if (villageEn.isBlank()) {
+                                villageEn = School.extractVillageName(it)
+                            }
+                        },
                         label = { Text("School Name (English)") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().testTag("edit_school_name_en_field")
                     )
+                    AppOutlinedTextField(
+                        value = code,
+                        onValueChange = { code = it },
+                        label = { Text("UDISE குறியீடு (UDISE Code)") },
+                        modifier = Modifier.fillMaxWidth().testTag("edit_school_udise_field")
+                    )
+                    
+                    Text("வட்டார கல்வி அலுவலர் பிரிவு (BEO Section):", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Navy900)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
+                        listOf(
+                            "BEO_I" to "BEO I",
+                            "BEO_II" to "BEO II",
+                            "BEO_III" to "BEO III",
+                            "OTHER" to (if (isTa) "அலுவலகம்" else "Office")
+                        ).forEach { (catKey, catName) ->
+                            FilterChip(
+                                selected = category == catKey,
+                                onClick = { category = catKey },
+                                label = { Text(catName, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppOutlinedTextField(
                             value = distanceKm,
@@ -315,27 +484,41 @@ fun SchoolDirectoryScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        val cleanVillageTa = villageTa.trim().ifEmpty { School.extractVillageName(nameTa) }
+                        val cleanVillageEn = villageEn.trim().ifEmpty { School.extractVillageName(nameEn) }
                         val school = (editingSchool ?: School(
                             serialNo = (uiState.allSchools.maxOfOrNull { it.serialNo } ?: 119) + 1,
-                            nameEn = nameEn.ifEmpty { nameTa },
-                            nameTa = nameTa,
+                            code = code.trim(),
+                            nameEn = nameEn.ifEmpty { nameTa }.trim(),
+                            nameTa = nameTa.trim(),
+                            category = category,
+                            villageTa = cleanVillageTa,
+                            villageEn = cleanVillageEn,
                             distanceFromHqKm = distanceKm.toIntOrNull() ?: 15,
                             defaultBusFare = busFare.toIntOrNull() ?: 15
                         )).copy(
-                            nameTa = nameTa,
-                            nameEn = nameEn.ifEmpty { nameTa },
+                            code = code.trim(),
+                            nameTa = nameTa.trim(),
+                            nameEn = nameEn.ifEmpty { nameTa }.trim(),
+                            category = category,
+                            villageTa = cleanVillageTa,
+                            villageEn = cleanVillageEn,
                             distanceFromHqKm = distanceKm.toIntOrNull() ?: 15,
                             defaultBusFare = busFare.toIntOrNull() ?: 15
                         )
                         onSaveSchool(school)
                         showAddEditDialog = false
-                    }
+                    },
+                    modifier = Modifier.testTag("save_school_confirm_btn")
                 ) {
                     Text("சேமிக்க (Save)")
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showAddEditDialog = false }) {
+                OutlinedButton(
+                    onClick = { showAddEditDialog = false },
+                    modifier = Modifier.testTag("cancel_school_edit_btn")
+                ) {
                     Text("ரத்து (Cancel)")
                 }
             }

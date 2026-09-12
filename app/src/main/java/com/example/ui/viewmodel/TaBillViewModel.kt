@@ -259,7 +259,8 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
         customDistanceKm: Int?,
         customBusFare: Double?,
         remarks: String,
-        entryToReplace: TourEntry? = null
+        entryToReplace: TourEntry? = null,
+        customArrivalStation: String? = null
     ) {
         viewModelScope.launch {
             val state = uiState.value
@@ -294,7 +295,8 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
                 terminal17b = t17b,
                 customDistanceKm = customDistanceKm,
                 customBusFare = customBusFare,
-                remarks = remarks
+                remarks = remarks,
+                customArrivalStation = customArrivalStation
             )
             closeQuickTourDialog()
             _feedbackMessage.value = if (toReplace != null) {

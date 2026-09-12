@@ -62,6 +62,15 @@ interface TaBillDao {
     @Query("SELECT COUNT(*) FROM schools")
     suspend fun getSchoolCount(): Int
 
+    @Query("SELECT COUNT(*) FROM schools WHERE category IN ('PUPS', 'PUMS', 'AIDED_PRIMARY', 'AIDED_MIDDLE')")
+    suspend fun getOldCategorySchoolCount(): Int
+
+    @Query("SELECT COUNT(*) FROM schools WHERE villageTa = '' OR villageTa IS NULL")
+    suspend fun getSchoolsWithEmptyVillageCount(): Int
+
+    @Query("DELETE FROM schools")
+    suspend fun deleteAllSchools()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSchool(school: School): Long
 

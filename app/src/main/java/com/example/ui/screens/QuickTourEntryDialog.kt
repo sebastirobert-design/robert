@@ -73,6 +73,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import java.util.Locale
 import com.example.ui.components.AppOutlinedTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -113,6 +114,7 @@ fun QuickTourEntryDialog(
     editingEntry: TourEntry?,
     existingEntries: List<TourEntry> = emptyList(),
     activeOfficerName: String = "",
+    activeOfficerSlot: Int = 1,
     onSaveTour: (
         dayOfMonth: Int,
         dateFormatted: String,
@@ -128,7 +130,8 @@ fun QuickTourEntryDialog(
         customDistanceKm: Int?,
         customBusFare: Double?,
         remarks: String,
-        entryToReplace: TourEntry?
+        entryToReplace: TourEntry?,
+        customArrivalStation: String?
     ) -> Unit,
     onExportToCsv: () -> Unit = {},
     onDismiss: () -> Unit,
@@ -183,6 +186,36 @@ fun QuickTourEntryDialog(
     val selectedDestinations = remember { mutableStateListOf<School>() }
     var showSchoolPicker by remember { mutableStateOf(false) }
 
+    // Town / Village Name state for arrival station (ஊரின் பெயர் மட்டும்)
+    var arrivalStationTownText by remember(editingEntry) {
+        mutableStateOf(
+            editingEntry?.arrivalStation?.let { raw ->
+                raw.split(".", ",").joinToString(".") { School.extractVillageName(it.trim()) }
+            } ?: ""
+        )
+    }
+
+    // Reactively update arrivalStationTownText when selectedDestinations change
+    LaunchedEffect(selectedDestinations.toList()) {
+        if (selectedDestinations.isNotEmpty()) {
+            arrivalStationTownText = selectedDestinations.joinToString(".") { it.getStationOrVillageName(isTamil) }
+        }
+    }
+
+    // Helper to find a matching school by village or name
+    val findMatchingSchool: (String) -> School? = { query ->
+        val q = query.trim()
+        allSchools.find {
+            it.villageTa.equals(q, ignoreCase = true) ||
+            it.villageEn.equals(q, ignoreCase = true) ||
+            it.getStationOrVillageName(true).equals(q, ignoreCase = true) ||
+            it.getStationOrVillageName(false).equals(q, ignoreCase = true) ||
+            it.nameTa.equals(q, ignoreCase = true) ||
+            it.nameEn.equals(q, ignoreCase = true) ||
+            (q.length >= 3 && (it.nameTa.contains(q) || it.nameEn.contains(q, ignoreCase = true) || it.villageTa.contains(q)))
+        }
+    }
+
     // Lambda to load an existing tour entry into the form for editing
     val loadExistingEntry: (TourEntry) -> Unit = { targetEntry ->
         currentEditingEntry = targetEntry
@@ -218,14 +251,17 @@ fun QuickTourEntryDialog(
         for (p in parts) {
             val trimmed = p.trim()
             if (trimmed.isNotEmpty()) {
-                val matchingSchool = allSchools.find { it.nameTa == trimmed || it.nameEn.equals(trimmed, ignoreCase = true) }
+                val matchingSchool = findMatchingSchool(trimmed)
                 if (matchingSchool != null) {
                     selectedDestinations.add(matchingSchool)
                 } else {
+                    val cleanVillage = School.extractVillageName(trimmed)
                     selectedDestinations.add(
                         School(
-                            nameEn = trimmed,
-                            nameTa = trimmed,
+                            nameEn = cleanVillage,
+                            nameTa = cleanVillage,
+                            villageTa = cleanVillage,
+                            villageEn = cleanVillage,
                             distanceFromHqKm = targetEntry.distanceKm,
                             defaultBusFare = targetEntry.busFare.toInt()
                         )
@@ -233,25 +269,44 @@ fun QuickTourEntryDialog(
                 }
             }
         }
+        arrivalStationTownText = if (selectedDestinations.isNotEmpty()) {
+            selectedDestinations.joinToString(".") { it.getStationOrVillageName(isTamil) }
+        } else {
+            parts.joinToString(".") { School.extractVillageName(it.trim()) }
+        }
     }
 
     // Pre-populate destination if editing initially
     remember(editingEntry) {
         if (editingEntry != null && selectedDestinations.isEmpty()) {
-            val matchingSchool = allSchools.find {
-                it.nameTa == editingEntry.arrivalStation || it.nameEn == editingEntry.arrivalStation
+            val parts = editingEntry.arrivalStation.split(".", ",")
+            for (p in parts) {
+                val trimmed = p.trim()
+                if (trimmed.isNotEmpty()) {
+                    val matchingSchool = findMatchingSchool(trimmed)
+                    if (matchingSchool != null) {
+                        selectedDestinations.add(matchingSchool)
+                    } else if (trimmed.isNotEmpty()) {
+                        val cleanVillage = School.extractVillageName(trimmed)
+                        selectedDestinations.add(
+                            School(
+                                nameEn = cleanVillage,
+                                nameTa = cleanVillage,
+                                villageTa = cleanVillage,
+                                villageEn = cleanVillage,
+                                distanceFromHqKm = editingEntry.distanceKm,
+                                defaultBusFare = editingEntry.busFare.toInt()
+                            )
+                        )
+                    }
+                }
             }
-            if (matchingSchool != null) {
-                selectedDestinations.add(matchingSchool)
-            } else if (editingEntry.arrivalStation.isNotEmpty()) {
-                selectedDestinations.add(
-                    School(
-                        nameEn = editingEntry.arrivalStation,
-                        nameTa = editingEntry.arrivalStation,
-                        distanceFromHqKm = editingEntry.distanceKm,
-                        defaultBusFare = editingEntry.busFare.toInt()
-                    )
-                )
+            if (arrivalStationTownText.isBlank()) {
+                arrivalStationTownText = if (selectedDestinations.isNotEmpty()) {
+                    selectedDestinations.joinToString(".") { it.getStationOrVillageName(isTamil) }
+                } else {
+                    parts.joinToString(".") { School.extractVillageName(it.trim()) }
+                }
             }
         }
     }
@@ -325,6 +380,11 @@ fun QuickTourEntryDialog(
         }
 
         val dateFormatted = DateUtils.formatDate(year, month, dayOfMonth)
+        val finalTownStation = if (arrivalStationTownText.isNotBlank()) {
+            arrivalStationTownText.trim()
+        } else {
+            destinationsToSave.joinToString(".") { it.getStationOrVillageName(isTamil) }
+        }
 
         onSaveTour(
             dayOfMonth,
@@ -341,7 +401,8 @@ fun QuickTourEntryDialog(
             customDistanceKmStr.toIntOrNull(),
             customBusFareStr.toDoubleOrNull(),
             remarks,
-            currentEditingEntry
+            currentEditingEntry,
+            finalTownStation
         )
     }
 
@@ -904,11 +965,34 @@ fun QuickTourEntryDialog(
                                                     )
                                                     Spacer(modifier = Modifier.width(6.dp))
                                                     Column {
+                                                        val villageName = school.getStationOrVillageName(isTamil)
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = villageName,
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 14.sp,
+                                                                color = Navy900
+                                                            )
+                                                            Surface(
+                                                                shape = RoundedCornerShape(4.dp),
+                                                                color = Color(0xFFC8E6C9)
+                                                            ) {
+                                                                Text(
+                                                                    text = if (isTamil) "ஊர்" else "Town",
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = Color(0xFF1B5E20),
+                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                )
+                                                            }
+                                                        }
                                                         Text(
                                                             text = if (isTamil && school.nameTa.isNotEmpty()) school.nameTa else school.nameEn,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontSize = 13.sp,
-                                                            color = Navy900
+                                                            fontSize = 11.5.sp,
+                                                            color = TextSecondary
                                                         )
                                                         Text(
                                                             text = "${school.distanceFromHqKm} km • ₹${school.defaultBusFare} bus fare",
@@ -948,10 +1032,53 @@ fun QuickTourEntryDialog(
                                 }
                             }
 
+                            // Prominent Destination Town / Village Box
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Place,
+                                            contentDescription = null,
+                                            tint = EmeraldGreen,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isTamil) "சென்றடைந்த ஊர் (Destination Town / Station)" else "Destination Town / Station",
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF166534)
+                                        )
+                                    }
+                                    AppOutlinedTextField(
+                                        value = arrivalStationTownText,
+                                        onValueChange = { arrivalStationTownText = it },
+                                        label = { Text(if (isTamil) "ஊரின் பெயர் மட்டும் (Town Name Only)" else "Town Name Only") },
+                                        placeholder = { Text(if (isTamil) "எ.கா. சேதுராணி, சாலையூர்" else "e.g. Sethurani, Salaiyur") },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("arrival_station_town_input"),
+                                        supportingText = {
+                                            Text(
+                                                text = if (isTamil) "படிவம் 1 & 2-ல் பள்ளியின் பெயர் வராமல் இந்த ஊரின் பெயர் மட்டுமே பதிவாகும்." else "Only this town name will appear in Form 1 & 2 (not school name).",
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF15803D)
+                                            )
+                                        },
+                                        singleLine = true
+                                    )
+                                }
+                            }
+
                             // Quick frequent chips
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = if (isTamil) "அடிக்கடி செல்லும் இடங்கள்:" else "Frequent Destinations:",
+                                text = if (isTamil) "அடிக்கடி செல்லும் ஊர்கள் / இடங்கள்:" else "Frequent Towns / Destinations:",
                                 fontSize = 11.sp,
                                 color = TextSecondary,
                                 fontWeight = FontWeight.Medium
@@ -970,7 +1097,7 @@ fun QuickTourEntryDialog(
                                         }
                                     ) {
                                         Text(
-                                            text = "+ ${if (isTamil && school.nameTa.isNotEmpty()) school.nameTa else school.nameEn}",
+                                            text = "+ ${school.getStationOrVillageName(isTamil)}",
                                             fontSize = 11.sp,
                                             color = Navy900,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -1564,9 +1691,16 @@ fun QuickTourEntryDialog(
 
     // Modal School Picker Sheet
     if (showSchoolPicker) {
+        val defaultCategory = when (activeOfficerSlot) {
+            1 -> "BEO_I"
+            2 -> "BEO_II"
+            3 -> "BEO_III"
+            else -> "ALL"
+        }
         SchoolPickerSheet(
             allSchools = allSchools,
             selectedSchools = selectedDestinations,
+            initialCategory = defaultCategory,
             onSelectSchool = { school ->
                 if (!selectedDestinations.any { it.id == school.id }) {
                     selectedDestinations.add(school)

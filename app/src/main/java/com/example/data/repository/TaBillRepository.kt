@@ -28,8 +28,9 @@ class TaBillRepository(private val dao: TaBillDao) {
     }
 
     suspend fun initializeDefaultDataIfNeeded() = withContext(Dispatchers.IO) {
-        // Seed schools if empty
-        if (dao.getSchoolCount() == 0) {
+        // Seed schools if empty or refresh if old categories or empty village names exist
+        if (dao.getSchoolCount() == 0 || dao.getOldCategorySchoolCount() > 0 || dao.getSchoolsWithEmptyVillageCount() > 0) {
+            dao.deleteAllSchools()
             dao.insertSchools(SchoolSeedData.initialSchools)
         }
 
@@ -99,15 +100,20 @@ class TaBillRepository(private val dao: TaBillDao) {
         terminal17b: Double,
         customDistanceKm: Int? = null,
         customBusFare: Double? = null,
-        remarks: String = ""
+        remarks: String = "",
+        customArrivalStation: String? = null
     ) = withContext(Dispatchers.IO) {
         val tripGroupId = UUID.randomUUID().toString()
         val entriesToInsert = mutableListOf<TourEntry>()
 
         if (destinations.isEmpty()) return@withContext
 
-        // Single or chained destinations
-        val destinationNameTa = destinations.joinToString(".") { it.nameTa.ifEmpty { it.nameEn } }
+        // Single or chained destinations - ONLY the town/village name (ஊரின் பெயர் மட்டும்)
+        val destinationVillageName = if (!customArrivalStation.isNullOrBlank()) {
+            customArrivalStation.trim()
+        } else {
+            destinations.joinToString(".") { it.getStationOrVillageName(isTamil = true) }
+        }
         val totalDistanceKm = customDistanceKm ?: destinations.sumOf { it.distanceKm() }
         val farePerLeg = customBusFare ?: destinations.sumOf { it.defaultBusFare.toDouble() }
 
@@ -126,7 +132,7 @@ class TaBillRepository(private val dao: TaBillDao) {
             departureStation = departureStation,
             departureDate = dateFormatted,
             departureHour = validDepHour,
-            arrivalStation = destinationNameTa,
+            arrivalStation = destinationVillageName,
             arrivalDate = dateFormatted,
             arrivalHour = validArrHour,
             purposeOfJourney = purposeOfJourney,
@@ -148,12 +154,17 @@ class TaBillRepository(private val dao: TaBillDao) {
         // 2. RETURN ENTRY (if round trip selected)
         if (isRoundTrip) {
             val returnGrandTotal = farePerLeg + terminal17a + terminal17b // Return leg does not duplicate daily DA
+            val returnDeparture = if (!customArrivalStation.isNullOrBlank()) {
+                customArrivalStation.trim()
+            } else {
+                destinations.last().getStationOrVillageName(isTamil = true)
+            }
             val returnEntry = TourEntry(
                 officerId = officerId,
                 monthYear = monthYear,
                 orderIndex = dayOfMonth * 10 + 2,
                 dayOfMonth = dayOfMonth,
-                departureStation = destinations.last().nameTa.ifEmpty { destinations.last().nameEn },
+                departureStation = returnDeparture,
                 departureDate = dateFormatted,
                 departureHour = validRetDepHour,
                 arrivalStation = departureStation,
