@@ -20,6 +20,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Info
@@ -87,6 +89,8 @@ fun SettingsScreen(
     onSelectSubTab: (Int) -> Unit = {},
     onPrintTaBill: () -> Unit = {},
     onExportToCsv: () -> Unit = {},
+    onBackupToDrive: () -> Unit = {},
+    onRestoreFromDrive: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isTa = uiState.isTamil
@@ -201,7 +205,9 @@ fun SettingsScreen(
                     onNavigateToOfficer = { onSelectSubTab(1) },
                     onNavigateToSchools = { onSelectSubTab(2) },
                     onPrintTaBill = onPrintTaBill,
-                    onExportToCsv = onExportToCsv
+                    onExportToCsv = onExportToCsv,
+                    onBackupToDrive = onBackupToDrive,
+                    onRestoreFromDrive = onRestoreFromDrive
                 )
             }
         }
@@ -219,7 +225,9 @@ private fun RatesAndSettingsView(
     onNavigateToOfficer: () -> Unit,
     onNavigateToSchools: () -> Unit,
     onPrintTaBill: () -> Unit,
-    onExportToCsv: () -> Unit
+    onExportToCsv: () -> Unit,
+    onBackupToDrive: () -> Unit = {},
+    onRestoreFromDrive: () -> Unit = {}
 ) {
     val isTa = uiState.isTamil
     val settings = uiState.appSettings
@@ -570,7 +578,122 @@ private fun RatesAndSettingsView(
             }
         }
 
-        // 4. 100% ஆஃப்லைன் பயன்பாடு & உள்ளூர் தரவுத்தளம் (Offline Architecture)
+        // 4. GOOGLE DRIVE BACKUP & RESTORE (கூகிள் டிரைவ் காப்புநகல் & மீட்டெடுப்பு)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE8F5E9)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudUpload,
+                                contentDescription = "Drive Backup",
+                                tint = Color(0xFF16A34A),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = if (isTa) "கூகிள் டிரைவ் காப்புநகல் & மீட்டெடுப்பு" else "Google Drive Backup & Restore",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.5.sp,
+                                color = Navy900
+                            )
+                            Text(
+                                text = if (isTa) "டிரைவில் தரவுகளைப் பாதுகாப்பாகச் சேமிக்க" else "Sync & protect data on Google Drive",
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = if (isTa)
+                            "செயலியின் அனைத்து மாதங்களின் பயணப் பதிவுகள், அலுவலர் சுயவிவரங்கள், 119 பள்ளிகள் மற்றும் படி விகிதங்களை ஒரே கிளிக்கில் கூகிள் டிரைவில் பாதுகாப்பாக காப்புநகல் எடுக்கலாம் அல்லது எப்போது வேண்டுமானாலும் மீட்டெடுக்கலாம்."
+                        else
+                            "Easily backup all tour diary entries, officer profiles, schools, and settings to Google Drive, or restore them seamlessly.",
+                        fontSize = 12.sp,
+                        color = Color(0xFF334155),
+                        lineHeight = 17.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Backup Button
+                        Button(
+                            onClick = onBackupToDrive,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .testTag("btn_google_drive_backup")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudUpload,
+                                contentDescription = "Backup",
+                                tint = Color.White,
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isTa) "டிரைவில் பேக்கப்" else "Backup to Drive",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+
+                        // Restore Button
+                        OutlinedButton(
+                            onClick = onRestoreFromDrive,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Navy900),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .testTag("btn_google_drive_restore")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudDownload,
+                                contentDescription = "Restore",
+                                tint = Navy900,
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isTa) "மீட்டெடு (Restore)" else "Restore File",
+                                color = Navy900,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. 100% ஆஃப்லைன் பயன்பாடு & உள்ளூர் தரவுத்தளம் (Offline Architecture)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),

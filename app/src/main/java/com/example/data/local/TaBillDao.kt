@@ -59,6 +59,9 @@ interface TaBillDao {
     @Query("SELECT * FROM schools WHERE id = :id LIMIT 1")
     suspend fun getSchoolById(id: Long): School?
 
+    @Query("SELECT * FROM schools WHERE code = :code LIMIT 1")
+    suspend fun getSchoolByCode(code: String): School?
+
     @Query("SELECT COUNT(*) FROM schools")
     suspend fun getSchoolCount(): Int
 
@@ -107,6 +110,21 @@ interface TaBillDao {
 
     @Query("UPDATE officer_profiles SET isActive = CASE WHEN id = :selectedId THEN 1 ELSE 0 END")
     suspend fun setActiveOfficer(selectedId: Long)
+
+    @Query("SELECT * FROM tour_entries ORDER BY monthYear ASC, dayOfMonth ASC, orderIndex ASC")
+    suspend fun getAllTourEntriesList(): List<TourEntry>
+
+    @Query("SELECT * FROM schools ORDER BY serialNo ASC")
+    suspend fun getAllSchoolsList(): List<School>
+
+    @Query("SELECT * FROM officer_profiles ORDER BY officerSlot ASC")
+    suspend fun getAllOfficersList(): List<OfficerProfile>
+
+    @Query("SELECT * FROM app_settings WHERE id = 1 LIMIT 1")
+    suspend fun getSettingsDirect(): AppSettings?
+
+    @Query("DELETE FROM tour_entries")
+    suspend fun deleteAllTourEntries()
 
     // ==================== APP SETTINGS ====================
     @Query("SELECT * FROM app_settings WHERE id = 1 LIMIT 1")

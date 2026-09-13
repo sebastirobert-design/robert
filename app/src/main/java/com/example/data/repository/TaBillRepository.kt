@@ -28,8 +28,15 @@ class TaBillRepository(private val dao: TaBillDao) {
     }
 
     suspend fun initializeDefaultDataIfNeeded() = withContext(Dispatchers.IO) {
-        // Seed schools if empty or refresh if old categories or empty village names exist
-        if (dao.getSchoolCount() == 0 || dao.getOldCategorySchoolCount() > 0 || dao.getSchoolsWithEmptyVillageCount() > 0) {
+        // Seed schools if empty or refresh if old categories, empty village names, or outdated school names exist
+        val firstSchool = dao.getSchoolByCode("33230505405")
+        val needsSchoolRefresh = dao.getSchoolCount() == 0 ||
+                dao.getOldCategorySchoolCount() > 0 ||
+                dao.getSchoolsWithEmptyVillageCount() > 0 ||
+                firstSchool?.nameEn != "HAMEEDIA PRIMARY SCHOOL SALAIYUR" ||
+                firstSchool?.villageTa != "இளையான்குடி ஹமீதியா"
+
+        if (needsSchoolRefresh) {
             dao.deleteAllSchools()
             dao.insertSchools(SchoolSeedData.initialSchools)
         }
@@ -305,5 +312,44 @@ class TaBillRepository(private val dao: TaBillDao) {
         dao.insertOrUpdateSettings(settings)
     }
 
+    suspend fun getAllDataForBackup(): BackupPayload = withContext(Dispatchers.IO) {
+        val tours = dao.getAllTourEntriesList()
+        val schools = dao.getAllSchoolsList()
+        val officers = dao.getAllOfficersList()
+        val settings = dao.getSettingsDirect()
+        BackupPayload(tours = tours, schools = schools, officers = officers, settings = settings)
+    }
+
+    suspend fun restoreBackupData(
+        tours: List<TourEntry>,
+        schools: List<School>,
+        officers: List<OfficerProfile>,
+        settings: AppSettings?,
+        replaceExistingTours: Boolean = true
+    ) = withContext(Dispatchers.IO) {
+        if (replaceExistingTours) {
+            dao.deleteAllTourEntries()
+        }
+        if (officers.isNotEmpty()) {
+            dao.insertOfficers(officers)
+        }
+        if (schools.isNotEmpty()) {
+            dao.insertSchools(schools)
+        }
+        if (settings != null) {
+            dao.insertOrUpdateSettings(settings)
+        }
+        if (tours.isNotEmpty()) {
+            dao.insertTourEntries(tours)
+        }
+    }
+
     private fun School.distanceKm(): Int = if (distanceFromHqKm > 0) distanceFromHqKm else 15
 }
+
+data class BackupPayload(
+    val tours: List<TourEntry>,
+    val schools: List<School>,
+    val officers: List<OfficerProfile>,
+    val settings: AppSettings?
+)

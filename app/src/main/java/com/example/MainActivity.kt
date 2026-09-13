@@ -2,8 +2,10 @@ package com.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,7 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.AppHeader
+import com.example.ui.components.BackupChoiceDialog
 import com.example.ui.components.PrintOptionsDialog
+import com.example.ui.components.RestorePreviewDialog
 import com.example.ui.screens.Form1DiaryScreen
 import com.example.ui.screens.Form2TaBillScreen
 import com.example.ui.screens.HomeScreen
@@ -55,6 +59,7 @@ import com.example.ui.theme.Navy700
 import com.example.ui.theme.Navy900
 import com.example.ui.viewmodel.TaBillViewModel
 import com.example.util.DateUtils
+import com.example.util.DriveBackupHelper
 
 class MainActivity : ComponentActivity() {
 
@@ -75,8 +80,27 @@ class MainActivity : ComponentActivity() {
 fun TaBillApp(viewModel: TaBillViewModel) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val pendingRestoreData by viewModel.pendingRestoreData.collectAsState()
+    val showBackupOptions by viewModel.showBackupOptionsDialog.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showPrintDialog by remember { mutableStateOf(false) }
+
+    // SAF File Pickers for Backup & Restore
+    val createBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            viewModel.saveBackupToUri(context, uri)
+        }
+    }
+
+    val restoreBackupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.inspectBackupFromUri(context, uri)
+        }
+    }
 
     // Show feedback messages as snackbar
     LaunchedEffect(uiState.userFeedbackMessage) {
@@ -225,7 +249,11 @@ fun TaBillApp(viewModel: TaBillViewModel) {
                     selectedSubTab = uiState.settingsSubTab,
                     onSelectSubTab = { viewModel.setSettingsSubTab(it) },
                     onPrintTaBill = { viewModel.printForm2TaBill(context) },
-                    onExportToCsv = { viewModel.exportToExcelGoogleSheet(context) }
+                    onExportToCsv = { viewModel.exportToExcelGoogleSheet(context) },
+                    onBackupToDrive = { viewModel.openBackupOptionsDialog() },
+                    onRestoreFromDrive = {
+                        restoreBackupLauncher.launch(arrayOf("application/json", "*/*"))
+                    }
                 )
                 5 -> ReportsDashboardScreen(
                     uiState = uiState,
@@ -347,6 +375,37 @@ fun TaBillApp(viewModel: TaBillViewModel) {
             onPdfExportForm2 = {
                 showPrintDialog = false
                 viewModel.printForm2TaBill(context)
+            }
+        )
+    }
+
+    // Google Drive Backup Choice Dialog
+    if (showBackupOptions) {
+        BackupChoiceDialog(
+            isTamil = isTa,
+            onDirectDriveShare = {
+                viewModel.backupDirectToGoogleDrive(context)
+            },
+            onSaveFileSaf = {
+                val fileName = DriveBackupHelper.getSuggestedFileName()
+                createBackupLauncher.launch(fileName)
+            },
+            onDismiss = {
+                viewModel.closeBackupOptionsDialog()
+            }
+        )
+    }
+
+    // Google Drive Restore Preview & Confirmation Dialog
+    pendingRestoreData?.let { backupData ->
+        RestorePreviewDialog(
+            backupData = backupData,
+            isTamil = isTa,
+            onConfirmRestore = { replaceAll ->
+                viewModel.confirmRestore(replaceExistingTours = replaceAll)
+            },
+            onDismiss = {
+                viewModel.dismissRestoreDialog()
             }
         )
     }

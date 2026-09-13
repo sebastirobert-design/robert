@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
@@ -11,8 +12,10 @@ import com.example.data.model.School
 import com.example.data.model.TourEntry
 import com.example.data.repository.TaBillRepository
 import com.example.util.DateUtils
+import com.example.util.DriveBackupHelper
 import com.example.util.PrintExportHelper
 import java.util.Calendar
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +27,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaBillViewModel(application: Application) : AndroidViewModel(application) {
@@ -43,6 +47,13 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
     private val _quickTourInitialMode = MutableStateFlow<String>("TOUR")
     private val _schoolSearchQuery = MutableStateFlow<String>("")
     private val _feedbackMessage = MutableStateFlow<String?>(null)
+
+    // Google Drive Backup & Restore States
+    private val _pendingRestoreData = MutableStateFlow<DriveBackupHelper.BackupData?>(null)
+    val pendingRestoreData: StateFlow<DriveBackupHelper.BackupData?> = _pendingRestoreData.asStateFlow()
+
+    private val _showBackupOptionsDialog = MutableStateFlow<Boolean>(false)
+    val showBackupOptionsDialog: StateFlow<Boolean> = _showBackupOptionsDialog.asStateFlow()
 
     val uiState: StateFlow<TaBillUiState>
 
@@ -538,6 +549,142 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
             entries = state.tourEntries,
             officer = state.activeOfficer
         )
+    }
+
+    // ==================== GOOGLE DRIVE BACKUP & RESTORE ====================
+
+    fun openBackupOptionsDialog() {
+        _showBackupOptionsDialog.value = true
+    }
+
+    fun closeBackupOptionsDialog() {
+        _showBackupOptionsDialog.value = false
+    }
+
+    /**
+     * Creates a full JSON backup file and opens Android's native share sheet targeting Google Drive / Files / Messaging
+     */
+    fun backupDirectToGoogleDrive(context: Context) {
+        viewModelScope.launch {
+            try {
+                val payload = repository.getAllDataForBackup()
+                val json = DriveBackupHelper.createBackupJson(
+                    officers = payload.officers,
+                    settings = payload.settings,
+                    schools = payload.schools,
+                    tourEntries = payload.tours
+                )
+                val file = DriveBackupHelper.createBackupFile(context, json)
+                val shareIntent = DriveBackupHelper.createShareToDriveIntent(context, file, uiState.value.isTamil)
+                context.startActivity(shareIntent)
+                _feedbackMessage.value = if (uiState.value.isTamil) {
+                    "Google Drive-ல் சேமிக்க பகிர்தல் திறக்கப்பட்டது (${payload.tours.size} பயணங்கள், ${payload.officers.size} அலுவலர்கள்)"
+                } else {
+                    "Opened Google Drive save sheet (${payload.tours.size} tours, ${payload.officers.size} officers)"
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackMessage.value = "Backup error: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    /**
+     * Saves full backup JSON to a SAF Document Uri (e.g. chosen Google Drive folder via document picker)
+     */
+    fun saveBackupToUri(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val payload = repository.getAllDataForBackup()
+                val json = DriveBackupHelper.createBackupJson(
+                    officers = payload.officers,
+                    settings = payload.settings,
+                    schools = payload.schools,
+                    tourEntries = payload.tours
+                )
+                val success = DriveBackupHelper.writeJsonToUri(context, uri, json)
+                if (success) {
+                    _feedbackMessage.value = if (uiState.value.isTamil) {
+                        "கூகிள் டிரைவில் / கோப்பில் காப்புநகல் வெற்றிகரமாகச் சேமிக்கப்பட்டது! (${payload.tours.size} பயணங்கள்)"
+                    } else {
+                        "Backup saved successfully to Google Drive / file! (${payload.tours.size} tours)"
+                    }
+                } else {
+                    _feedbackMessage.value = if (uiState.value.isTamil) "கோப்பைச் சேமிக்க இயலவில்லை" else "Failed to save backup file"
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackMessage.value = "Save error: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    /**
+     * Reads and parses a backup file picked from Google Drive / storage, showing a preview dialog
+     */
+    fun inspectBackupFromUri(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonString = DriveBackupHelper.readJsonFromUri(context, uri)
+                if (jsonString.isNullOrBlank()) {
+                    withContext(Dispatchers.Main) {
+                        _feedbackMessage.value = if (uiState.value.isTamil) "காப்புநகல் கோப்பைப் படிக்க இயலவில்லை" else "Could not read backup file"
+                    }
+                    return@launch
+                }
+
+                val parseResult = DriveBackupHelper.parseBackupJson(jsonString)
+                parseResult.onSuccess { data ->
+                    withContext(Dispatchers.Main) {
+                        _pendingRestoreData.value = data
+                    }
+                }.onFailure { err ->
+                    withContext(Dispatchers.Main) {
+                        _feedbackMessage.value = if (uiState.value.isTamil) {
+                            "தவறான காப்புநகல் வடிவம்: ${err.localizedMessage}"
+                        } else {
+                            "Invalid backup format: ${err.localizedMessage}"
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    _feedbackMessage.value = "Error reading backup: ${e.localizedMessage}"
+                }
+            }
+        }
+    }
+
+    /**
+     * Executes the restoration of verified backup data into the local Room database
+     */
+    fun confirmRestore(replaceExistingTours: Boolean = true) {
+        val data = _pendingRestoreData.value ?: return
+        viewModelScope.launch {
+            try {
+                repository.restoreBackupData(
+                    tours = data.tourEntries,
+                    schools = data.schools,
+                    officers = data.officers,
+                    settings = data.settings,
+                    replaceExistingTours = replaceExistingTours
+                )
+                _pendingRestoreData.value = null
+                _feedbackMessage.value = if (uiState.value.isTamil) {
+                    "மீட்டெடுப்பு முடிந்தது! (${data.tourCount} பயணங்கள், ${data.officerCount} அலுவலர்கள், ${data.schoolCount} பள்ளிகள் புதுப்பிக்கப்பட்டன)"
+                } else {
+                    "Restore complete! (${data.tourCount} tours, ${data.officerCount} officers, ${data.schoolCount} schools restored)"
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _feedbackMessage.value = "Restore error: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun dismissRestoreDialog() {
+        _pendingRestoreData.value = null
     }
 }
 
