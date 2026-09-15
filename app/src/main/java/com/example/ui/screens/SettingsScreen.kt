@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
@@ -63,9 +64,11 @@ import com.example.data.model.AppSettings
 import com.example.data.model.OfficerProfile
 import com.example.data.model.School
 import com.example.ui.components.AppOutlinedTextField
+import com.example.ui.components.UserGuideDialog
 import com.example.ui.theme.CrimsonRed
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.Navy700
+import com.example.ui.theme.Navy800
 import com.example.ui.theme.Navy900
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -239,6 +242,7 @@ private fun RatesAndSettingsView(
     var baseHqTa by remember(settings) { mutableStateOf(settings.baseHeadquartersTa) }
 
     var showClearDialog by remember { mutableStateOf(false) }
+    var showUserGuideDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -356,6 +360,97 @@ private fun RatesAndSettingsView(
                             fontSize = 11.sp,
                             color = TextSecondary,
                             maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+
+        // USER GUIDE BUTTON CARD (பயனர் கையேடு)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showUserGuideDialog = true }
+                    .testTag("settings_user_guide_card"),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(GoldAccent.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                                contentDescription = "Guide",
+                                tint = GoldAccent,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (isTa) "பயனர் கையேடு (User Guide)" else "User Guide & Manual",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.5.sp,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = GoldAccent
+                                ) {
+                                    Text(
+                                        text = if (isTa) "வழிகாட்டி" else "Guide",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Navy900,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = if (isTa)
+                                    "செயலியைப் பயன்படுத்தும் முழுமையான வழிமுறைகள், கருவூல TA விதிகள் & குறிப்புகள்"
+                                else
+                                    "Complete step-by-step tutorial, TN Treasury TA rules & helpful tips",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFFCBD5E1),
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { showUserGuideDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .testTag("settings_open_user_guide_btn")
+                    ) {
+                        Text(
+                            text = if (isTa) "திறக்க" else "Open",
+                            color = Navy900,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
                         )
                     }
                 }
@@ -798,6 +893,29 @@ private fun RatesAndSettingsView(
                         color = TextSecondary,
                         lineHeight = 18.sp
                     )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = { showUserGuideDialog = true },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp)
+                            .testTag("settings_info_user_guide_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                            contentDescription = null,
+                            tint = Navy800,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isTa) "முழுமையான பயனர் கையேட்டைப் படிக்க (Read User Guide)" else "Read Full User Guide",
+                            color = Navy900,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }
@@ -826,6 +944,13 @@ private fun RatesAndSettingsView(
                     Text(if (isTa) "ரத்து (Cancel)" else "Cancel")
                 }
             }
+        )
+    }
+
+    if (showUserGuideDialog) {
+        UserGuideDialog(
+            isTamil = isTa,
+            onDismiss = { showUserGuideDialog = false }
         )
     }
 }
