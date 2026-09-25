@@ -452,7 +452,9 @@ fun TourRowCard(
                     if (entry.isNonTravel) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (entry.nonTravelType.contains("விடுமுறை")) AmberDark else CrimsonRed
+                            color = if (entry.nonTravelType.contains("விடுமுறை")) AmberDark
+                            else if (entry.nonTravelType.contains("தற்செயல்")) CrimsonRed
+                            else BlueAccent
                         ) {
                             Text(
                                 text = entry.nonTravelType,

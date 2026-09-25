@@ -240,7 +240,7 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
         _editingTourEntry.value = null
     }
 
-    fun addNonTravelDayFromDialog(dayOfMonth: Int, dateFormatted: String, type: String, closeDialog: Boolean = false) {
+    fun addNonTravelDayFromDialog(dayOfMonth: Int, dateFormatted: String, type: String, customReason: String? = null, closeDialog: Boolean = false) {
         viewModelScope.launch {
             val state = uiState.value
             repository.addNonTravelDay(
@@ -248,12 +248,14 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
                 monthYear = state.selectedMonthYear,
                 dayOfMonth = dayOfMonth,
                 dateFormatted = dateFormatted,
-                type = type
+                type = type,
+                customReason = customReason
             )
             if (closeDialog) {
                 closeQuickTourDialog()
             }
-            _feedbackMessage.value = "$type ($dateFormatted) சேர்க்கப்பட்டது! (Added)"
+            val displayLabel = customReason?.trim()?.ifBlank { null } ?: type
+            _feedbackMessage.value = "$displayLabel ($dateFormatted) சேர்க்கப்பட்டது! (Added)"
         }
     }
 
@@ -340,7 +342,7 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun addNonTravelDay(dayOfMonth: Int, dateFormatted: String, type: String) {
+    fun addNonTravelDay(dayOfMonth: Int, dateFormatted: String, type: String, customReason: String? = null) {
         viewModelScope.launch {
             val state = uiState.value
             repository.addNonTravelDay(
@@ -348,10 +350,12 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
                 monthYear = state.selectedMonthYear,
                 dayOfMonth = dayOfMonth,
                 dateFormatted = dateFormatted,
-                type = type
+                type = type,
+                customReason = customReason
             )
             closeQuickNonTravelDialog()
-            _feedbackMessage.value = "$type சேர்க்கப்பட்டது! (Added)"
+            val displayLabel = customReason?.trim()?.ifBlank { null } ?: type
+            _feedbackMessage.value = "$displayLabel சேர்க்கப்பட்டது! (Added)"
         }
     }
 

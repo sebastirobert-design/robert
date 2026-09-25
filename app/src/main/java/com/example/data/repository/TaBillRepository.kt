@@ -202,61 +202,51 @@ class TaBillRepository(private val dao: TaBillDao) {
         monthYear: String,
         dayOfMonth: Int,
         dateFormatted: String,
-        type: String // "தற்செயல்விடுப்பு" (CL), "விடுமுறை" (Holiday), "அலுவலகப்பணி" (HQ Duty)
+        type: String, // "விடுமுறை", "தற்செயல் விடுப்பு", "அலுவலகப்பணி"
+        customReason: String? = null
     ) = withContext(Dispatchers.IO) {
-        val entry = when (type) {
-            "தற்செயல்விடுப்பு" -> TourEntry(
-                officerId = officerId,
-                monthYear = monthYear,
-                orderIndex = dayOfMonth * 10,
-                dayOfMonth = dayOfMonth,
-                isNonTravel = true,
-                nonTravelType = "தற்செயல்விடுப்பு",
-                departureStation = "தற்செயல்விடுப்பு",
-                departureDate = dateFormatted,
-                departureHour = "",
-                arrivalStation = "தற்செயல்விடுப்பு",
-                arrivalDate = dateFormatted,
-                arrivalHour = "",
-                purposeOfJourney = "தற்செயல்விடுப்பு (CL)",
-                kindOfJourney = "",
-                distanceKm = 0
-            )
-            "விடுமுறை" -> TourEntry(
-                officerId = officerId,
-                monthYear = monthYear,
-                orderIndex = dayOfMonth * 10,
-                dayOfMonth = dayOfMonth,
-                isNonTravel = true,
-                nonTravelType = "விடுமுறை",
-                departureStation = "விடுமுறை",
-                departureDate = dateFormatted,
-                departureHour = "",
-                arrivalStation = "விடுமுறை",
-                arrivalDate = dateFormatted,
-                arrivalHour = "",
-                purposeOfJourney = "விடுமுறை (Holiday)",
-                kindOfJourney = "",
-                distanceKm = 0
-            )
-            else -> TourEntry(
-                officerId = officerId,
-                monthYear = monthYear,
-                orderIndex = dayOfMonth * 10,
-                dayOfMonth = dayOfMonth,
-                isNonTravel = true,
-                nonTravelType = "அலுவலகப்பணி",
-                departureStation = "தலைமையிடம்",
-                departureDate = dateFormatted,
-                departureHour = "",
-                arrivalStation = "அலுவலகப்பணி",
-                arrivalDate = dateFormatted,
-                arrivalHour = "",
-                purposeOfJourney = "அலுவலகப்பணி (HQ Office Duty)",
-                kindOfJourney = "",
-                distanceKm = 0
-            )
+        // Delete any existing entries for this day to avoid duplicate records
+        dao.deleteTourEntriesForDay(officerId, monthYear, dayOfMonth)
+
+        val cleanType = when {
+            type.contains("தற்செயல்") -> "தற்செயல் விடுப்பு"
+            type.contains("அலுவலக") -> "அலுவலகப்பணி"
+            else -> "விடுமுறை"
         }
+
+        val displayPurpose = customReason?.trim()?.ifBlank { null }
+            ?: cleanType
+
+        val stationName = when (cleanType) {
+            "தற்செயல் விடுப்பு" -> "தற்செயல் விடுப்பு"
+            "அலுவலகப்பணி" -> "தலைமையிடம்"
+            else -> "விடுமுறை"
+        }
+
+        val entry = TourEntry(
+            officerId = officerId,
+            monthYear = monthYear,
+            orderIndex = dayOfMonth * 10,
+            dayOfMonth = dayOfMonth,
+            isNonTravel = true,
+            nonTravelType = cleanType,
+            departureStation = stationName,
+            departureDate = dateFormatted,
+            departureHour = "",
+            arrivalStation = stationName,
+            arrivalDate = dateFormatted,
+            arrivalHour = "",
+            purposeOfJourney = displayPurpose,
+            kindOfJourney = "",
+            distanceKm = 0,
+            busFare = 0.0,
+            daRate = 0.0,
+            daAmount = 0.0,
+            terminalCharge17a = 0.0,
+            terminalCharge17b = 0.0,
+            incidentalCharges = 0.0,
+            grandTotal = 0.0
+        )
         dao.insertTourEntry(entry)
     }
 

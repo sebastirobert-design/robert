@@ -49,6 +49,9 @@ interface TaBillDao {
     @Query("DELETE FROM tour_entries WHERE officerId = :officerId AND monthYear = :monthYear")
     suspend fun deleteTourEntriesForMonth(officerId: Long, monthYear: String)
 
+    @Query("DELETE FROM tour_entries WHERE officerId = :officerId AND monthYear = :monthYear AND dayOfMonth = :dayOfMonth")
+    suspend fun deleteTourEntriesForDay(officerId: Long, monthYear: String, dayOfMonth: Int)
+
     // ==================== SCHOOLS ====================
     @Query("SELECT * FROM schools ORDER BY serialNo ASC, nameEn ASC")
     fun getAllSchools(): Flow<List<School>>

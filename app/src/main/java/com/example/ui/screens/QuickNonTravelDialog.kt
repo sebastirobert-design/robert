@@ -57,7 +57,7 @@ import com.example.util.DateUtils
 fun QuickNonTravelDialog(
     monthYear: String,
     initialDay: Int = DateUtils.getCurrentCalendar().get(java.util.Calendar.DAY_OF_MONTH),
-    onAddNonTravel: (dayOfMonth: Int, dateFormatted: String, type: String) -> Unit,
+    onAddNonTravel: (dayOfMonth: Int, dateFormatted: String, type: String, customReason: String?) -> Unit,
     onDismiss: () -> Unit,
     isTamil: Boolean,
     modifier: Modifier = Modifier
@@ -66,12 +66,13 @@ fun QuickNonTravelDialog(
     val (year, month) = DateUtils.parseYearMonth(monthYear)
     var dayOfMonth by remember { mutableIntStateOf(initialDay.coerceIn(1, 31)) }
     var dayStr by remember { mutableStateOf(String.format("%02d", initialDay.coerceIn(1, 31))) }
-    var selectedType by remember { mutableStateOf("தற்செயல்விடுப்பு") }
+    var selectedType by remember { mutableStateOf("விடுமுறை") }
+    var reasonText by remember { mutableStateOf("விடுமுறை") }
 
     val types = listOf(
-        Triple("தற்செயல்விடுப்பு", "Casual Leave (CL)", CrimsonRed),
-        Triple("விடுமுறை", "Holiday / Weekend", AmberDark),
-        Triple("அலுவலகப்பணி", "HQ Office Duty", BlueAccent)
+        Triple("விடுமுறை", if (isTamil) "1. விடுமுறை (Holiday)" else "1. Holiday", AmberDark),
+        Triple("தற்செயல் விடுப்பு", if (isTamil) "2. தற்செயல் விடுப்பு (CL)" else "2. Casual Leave", CrimsonRed),
+        Triple("அலுவலகப்பணி", if (isTamil) "3. அலுவலகப்பணி (Office Duty)" else "3. HQ Office Duty", BlueAccent)
     )
 
     ModalBottomSheet(
@@ -91,7 +92,7 @@ fun QuickNonTravelDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isTamil) "விடுமுறை / அலுவலகப் பணி பதிவு" else "Add Leave / Holiday / HQ Duty",
+                    text = if (isTamil) "விடுமுறை / பணி பதிவு" else "Add Leave / Office Duty",
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = Navy900
@@ -165,7 +166,7 @@ fun QuickNonTravelDialog(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = if (isTamil) "வகை தேர்வு செய்க:" else "Select Type:",
+                text = if (isTamil) "வகை தேர்வு செய்க (3 ஆப்ஷன்கள்):" else "Select Type (3 Options Only):",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = Navy900
@@ -173,27 +174,30 @@ fun QuickNonTravelDialog(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Type selector cards
+            // 3 Type selector cards: 1. விடுமுறை 2. தற்செயல் விடுப்பு 3. அலுவலகப்பணி
             types.forEach { (typeKey, typeLabel, color) ->
                 val isSelected = selectedType == typeKey
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
-                    onClick = { selectedType = typeKey },
+                    onClick = {
+                        selectedType = typeKey
+                        reasonText = typeKey
+                    },
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelected) Color(0xFFE8EAF6) else Color(0xFFF8F9FA)
                     ),
-                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, Navy700) else null
+                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, color) else null
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         val icon = when (typeKey) {
-                            "தற்செயல்விடுப்பு" -> Icons.Default.EventBusy
                             "விடுமுறை" -> Icons.Default.BeachAccess
+                            "தற்செயல் விடுப்பு" -> Icons.Default.EventBusy
                             else -> Icons.Default.Business
                         }
                         Icon(
@@ -204,19 +208,57 @@ fun QuickNonTravelDialog(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = typeKey,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = Navy900
-                            )
-                            Text(
                                 text = typeLabel,
-                                fontSize = 11.5.sp,
-                                color = TextSecondary
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.5.sp,
+                                color = if (isSelected) Navy900 else Color(0xFF334155)
                             )
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // கட்டம் இட்டு edit செய்யும் பகுதி (Editable Text Box)
+            Text(
+                text = if (isTamil) "காரணம் / விவரிப்பு (கட்டம் - திருத்துக):" else "Description / Reason (Edit):",
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Navy900
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            AppOutlinedTextField(
+                value = reasonText,
+                onValueChange = { reasonText = it },
+                label = { Text(if (isTamil) "விடுமுறை / பணி விவரம் (கட்டம்)" else "Leave / Duty Details") },
+                placeholder = { Text(if (isTamil) "விடுமுறை / தற்செயல் விடுப்பு / அலுவலகப்பணி" else "Holiday / CL / Office Duty") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("non_travel_reason_input"),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // இம்மூன்றுக்கும் பயணப்படி (TA) க்ளைம் கிடையாது விளக்கம்
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFFFEF3C7),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (isTamil) {
+                        "இம்மூன்றுக்கும் பயணப்படி (TA) க்ளைம் கிடையாது (₹0). படிவம் 1 பயணக் குறிப்பேட்டில் மட்டும் '${reasonText.trim().ifBlank { selectedType }}' எனப் பதிவாகும்."
+                    } else {
+                        "No TA allowance claimed (₹0). Recorded in Form 1 Tour Diary only as '${reasonText.trim().ifBlank { selectedType }}'."
+                    },
+                    fontSize = 11.5.sp,
+                    color = Color(0xFF92400E),
+                    lineHeight = 16.sp,
+                    modifier = Modifier.padding(10.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -224,13 +266,20 @@ fun QuickNonTravelDialog(
             Button(
                 onClick = {
                     val dateFormatted = DateUtils.formatDate(year, month, dayOfMonth)
-                    onAddNonTravel(dayOfMonth, dateFormatted, selectedType)
+                    val finalReason = reasonText.trim().ifBlank { selectedType }
+                    onAddNonTravel(dayOfMonth, dateFormatted, selectedType, finalReason)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
                     .testTag("save_non_travel_btn"),
-                colors = ButtonDefaults.buttonColors(containerColor = Navy700),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = when (selectedType) {
+                        "தற்செயல் விடுப்பு" -> CrimsonRed
+                        "விடுமுறை" -> AmberDark
+                        else -> BlueAccent
+                    }
+                ),
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(

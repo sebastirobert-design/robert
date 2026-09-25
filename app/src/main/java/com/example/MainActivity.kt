@@ -316,8 +316,8 @@ fun TaBillApp(viewModel: TaBillViewModel) {
                     customArrivalStation = customArrivalStation
                 )
             },
-            onAddNonTravel = { dayOfMonth, dateFormatted, type ->
-                viewModel.addNonTravelDayFromDialog(dayOfMonth, dateFormatted, type)
+            onAddNonTravel = { dayOfMonth, dateFormatted, type, customReason ->
+                viewModel.addNonTravelDayFromDialog(dayOfMonth, dateFormatted, type, customReason)
             },
             onDeleteEntry = { entry ->
                 viewModel.deleteTourEntry(entry)
@@ -336,8 +336,8 @@ fun TaBillApp(viewModel: TaBillViewModel) {
     if (uiState.showQuickNonTravelDialog) {
         QuickNonTravelDialog(
             monthYear = uiState.selectedMonthYear,
-            onAddNonTravel = { dayOfMonth, dateFormatted, type ->
-                viewModel.addNonTravelDay(dayOfMonth, dateFormatted, type)
+            onAddNonTravel = { dayOfMonth, dateFormatted, type, customReason ->
+                viewModel.addNonTravelDay(dayOfMonth, dateFormatted, type, customReason)
             },
             onDismiss = { viewModel.closeQuickNonTravelDialog() },
             isTamil = isTa,

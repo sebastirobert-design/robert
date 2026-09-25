@@ -140,7 +140,7 @@ fun QuickTourEntryDialog(
         entryToReplace: TourEntry?,
         customArrivalStation: String?
     ) -> Unit,
-    onAddNonTravel: ((dayOfMonth: Int, dateFormatted: String, type: String) -> Unit)? = null,
+    onAddNonTravel: ((dayOfMonth: Int, dateFormatted: String, type: String, customReason: String?) -> Unit)? = null,
     onDeleteEntry: ((TourEntry) -> Unit)? = null,
     onUpdateSchool: ((School) -> Unit)? = null,
     onExportToCsv: () -> Unit = {},
@@ -166,11 +166,19 @@ fun QuickTourEntryDialog(
         )
     }
     var selectedNonTravelType by remember(editingEntry) {
-        mutableStateOf(editingEntry?.nonTravelType?.ifEmpty { "தற்செயல்விடுப்பு" } ?: "தற்செயல்விடுப்பு")
+        val initialType = editingEntry?.nonTravelType?.ifEmpty { "விடுமுறை" } ?: "விடுமுறை"
+        mutableStateOf(
+            if (initialType.contains("தற்செயல்")) "தற்செயல் விடுப்பு"
+            else if (initialType.contains("அலுவலக")) "அலுவலகப்பணி"
+            else "விடுமுறை"
+        )
     }
     var nonTravelReasonText by remember(editingEntry) {
         mutableStateOf(
-            editingEntry?.purposeOfJourney ?: if (selectedNonTravelType == "தற்செயல்விடுப்பு") "தற்செயல்விடுப்பு (CL)" else "விடுமுறை"
+            editingEntry?.purposeOfJourney?.ifBlank { null }
+                ?: if (selectedNonTravelType == "தற்செயல் விடுப்பு") "தற்செயல் விடுப்பு"
+                else if (selectedNonTravelType == "அலுவலகப்பணி") "அலுவலகப்பணி"
+                else "விடுமுறை"
         )
     }
 
@@ -251,8 +259,12 @@ fun QuickTourEntryDialog(
 
         if (targetEntry.isNonTravel) {
             entryMode = "LEAVE"
-            selectedNonTravelType = targetEntry.nonTravelType.ifEmpty { "தற்செயல்விடுப்பு" }
-            nonTravelReasonText = targetEntry.purposeOfJourney
+            selectedNonTravelType = when {
+                targetEntry.nonTravelType.contains("தற்செயல்") -> "தற்செயல் விடுப்பு"
+                targetEntry.nonTravelType.contains("அலுவலக") -> "அலுவலகப்பணி"
+                else -> "விடுமுறை"
+            }
+            nonTravelReasonText = targetEntry.purposeOfJourney.ifBlank { selectedNonTravelType }
         } else {
             entryMode = "TOUR"
             departureStation = targetEntry.departureStation.ifEmpty { "தலைமையிடம்" }
@@ -442,14 +454,18 @@ fun QuickTourEntryDialog(
 
     val performSaveLeave: (Boolean) -> Unit = { advanceToNext ->
         val dateFormatted = DateUtils.formatDate(year, month, dayOfMonth)
-        val finalReason = nonTravelReasonText.ifBlank {
-            when (selectedNonTravelType) {
-                "தற்செயல்விடுப்பு" -> "தற்செயல்விடுப்பு (CL)"
-                "விடுமுறை" -> "விடுமுறை (Holiday)"
-                else -> "அலுவலகப்பணி"
+        val finalReason = nonTravelReasonText.trim().ifBlank { selectedNonTravelType }
+        val finalType = when (selectedNonTravelType) {
+            "தற்செயல் விடுப்பு" -> "தற்செயல் விடுப்பு"
+            "அலுவலகப்பணி" -> "அலுவலகப்பணி"
+            "விடுமுறை" -> "விடுமுறை"
+            else -> when {
+                finalReason.contains("தற்செயல்") -> "தற்செயல் விடுப்பு"
+                finalReason.contains("அலுவலக") -> "அலுவலகப்பணி"
+                else -> "விடுமுறை"
             }
         }
-        onAddNonTravel?.invoke(dayOfMonth, dateFormatted, finalReason)
+        onAddNonTravel?.invoke(dayOfMonth, dateFormatted, finalType, finalReason)
         if (advanceToNext) {
             if (dayOfMonth < daysInMonth) {
                 dayOfMonth += 1
@@ -1198,11 +1214,11 @@ fun QuickTourEntryDialog(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                // 3 Main Type Options as selectable Cards
+                                // மூன்றே ஆப்ஷன்கள் (Only 3 Options): 1. விடுமுறை 2. தற்செயல் விடுப்பு 3. அலுவலகப்பணி
                                 val leaveTypes = listOf(
-                                    Triple("தற்செயல்விடுப்பு", if (isTamil) "தற்செயல் விடுப்பு (CL)" else "Casual Leave (CL)", CrimsonRed),
-                                    Triple("விடுமுறை", if (isTamil) "பொது விடுமுறை / ஞாயிறு" else "Holiday / Weekend", AmberDark),
-                                    Triple("அலுவலகப்பணி", if (isTamil) "தலைமையிட அலுவலகப்பணி" else "HQ Office Duty", BlueAccent)
+                                    Triple("விடுமுறை", if (isTamil) "1. விடுமுறை" else "1. Holiday", AmberDark),
+                                    Triple("தற்செயல் விடுப்பு", if (isTamil) "2. தற்செயல் விடுப்பு" else "2. Casual Leave", CrimsonRed),
+                                    Triple("அலுவலகப்பணி", if (isTamil) "3. அலுவலகப்பணி" else "3. Office Duty", BlueAccent)
                                 )
 
                                 Row(
@@ -1216,10 +1232,9 @@ fun QuickTourEntryDialog(
                                                 .weight(1f)
                                                 .clickable {
                                                     selectedNonTravelType = typeKey
-                                                    if (typeKey == "தற்செயல்விடுப்பு") nonTravelReasonText = "தற்செயல்விடுப்பு (CL)"
-                                                    else if (typeKey == "விடுமுறை") nonTravelReasonText = "விடுமுறை (Holiday)"
-                                                    else if (typeKey == "அலுவலகப்பணி") nonTravelReasonText = "அலுவலகப்பணி"
-                                                },
+                                                    nonTravelReasonText = typeKey
+                                                }
+                                                .testTag("leave_type_btn_$typeKey"),
                                             shape = RoundedCornerShape(10.dp),
                                             color = if (isSelected) color.copy(alpha = 0.12f) else Color(0xFFF8FAFC),
                                             border = BorderStroke(
@@ -1228,31 +1243,31 @@ fun QuickTourEntryDialog(
                                             )
                                         ) {
                                             Column(
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(28.dp)
+                                                        .size(32.dp)
                                                         .clip(CircleShape)
                                                         .background(if (isSelected) color else Color(0xFFE2E8F0)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Icon(
                                                         imageVector = when (typeKey) {
-                                                            "தற்செயல்விடுப்பு" -> Icons.Default.EventBusy
                                                             "விடுமுறை" -> Icons.Default.BeachAccess
+                                                            "தற்செயல் விடுப்பு" -> Icons.Default.EventBusy
                                                             else -> Icons.Default.Business
                                                         },
                                                         contentDescription = null,
                                                         tint = if (isSelected) Color.White else Color(0xFF64748B),
-                                                        modifier = Modifier.size(16.dp)
+                                                        modifier = Modifier.size(18.dp)
                                                     )
                                                 }
-                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Spacer(modifier = Modifier.height(8.dp))
                                                 Text(
                                                     text = label,
-                                                    fontSize = 10.5.sp,
+                                                    fontSize = 11.5.sp,
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                     color = if (isSelected) color else Color(0xFF334155),
                                                     textAlign = TextAlign.Center,
@@ -1263,60 +1278,22 @@ fun QuickTourEntryDialog(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
 
-                                // Fast Preset Reason Chips
+                                // கட்டம் இட்டு edit செய்யும் பகுதி (Editable Text Box)
                                 Text(
-                                    text = if (isTamil) "விரைவு காரணங்கள் (Quick Presets):" else "Quick Presets:",
-                                    fontSize = 11.5.sp,
+                                    text = if (isTamil) "காரணம் / விவரிப்பு (கட்டம் - திருத்துக):" else "Description / Reason (Edit):",
+                                    fontSize = 12.5.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = TextSecondary
+                                    color = Navy900
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
-
-                                FlowRow(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    val presets = listOf(
-                                        "ஞாயிற்றுக்கிழமை" to "விடுமுறை",
-                                        "2-வது சனிக்கிழமை" to "விடுமுறை",
-                                        "அரசு விடுமுறை" to "விடுமுறை",
-                                        "தற்செயல் விடுப்பு (CL)" to "தற்செயல்விடுப்பு",
-                                        "BEO அலுவலக பணி" to "அலுவலகப்பணி",
-                                        "வட்டார வள மையப் பயிற்சி" to "அலுவலகப்பணி",
-                                        "நீதிமன்ற பணி (Court OD)" to "அலுவலகப்பணி"
-                                    )
-                                    presets.forEach { (presetLabel, matchingType) ->
-                                        val isChipActive = nonTravelReasonText == presetLabel
-                                        Surface(
-                                            shape = RoundedCornerShape(16.dp),
-                                            color = if (isChipActive) Navy700 else Color(0xFFF1F5F9),
-                                            border = BorderStroke(1.dp, if (isChipActive) Navy700 else Color(0xFFE2E8F0)),
-                                            modifier = Modifier.clickable {
-                                                nonTravelReasonText = presetLabel
-                                                selectedNonTravelType = matchingType
-                                            }
-                                        ) {
-                                            Text(
-                                                text = presetLabel,
-                                                fontSize = 11.sp,
-                                                color = if (isChipActive) Color.White else Color(0xFF334155),
-                                                fontWeight = if (isChipActive) FontWeight.Bold else FontWeight.Normal,
-                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
 
                                 AppOutlinedTextField(
                                     value = nonTravelReasonText,
                                     onValueChange = { nonTravelReasonText = it },
-                                    label = { Text(if (isTamil) "காரணம் / விவரிப்பு (Reason / Description)" else "Reason / Description") },
-                                    placeholder = { Text(if (isTamil) "எ.கா: ஞாயிற்றுக்கிழமை / CL" else "e.g., Sunday / CL") },
+                                    label = { Text(if (isTamil) "விடுமுறை / பணி விவரம் (கட்டம்)" else "Leave / Duty Details") },
+                                    placeholder = { Text(if (isTamil) "விடுமுறை / தற்செயல் விடுப்பு / அலுவலகப்பணி" else "Holiday / CL / Office Duty") },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .testTag("non_travel_reason_input"),
@@ -1325,11 +1302,11 @@ fun QuickTourEntryDialog(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                // Information Card
+                                // இம்மூன்றுக்கும் பயணப்படி (TA) க்ளைம் செய்யப்படாது (₹0) விளக்கம்
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFFF0FDF4),
-                                    border = BorderStroke(1.dp, Color(0xFFBBF7D0)),
+                                    color = Color(0xFFFEF3C7),
+                                    border = BorderStroke(1.dp, Color(0xFFFDE68A)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
@@ -1339,19 +1316,20 @@ fun QuickTourEntryDialog(
                                         Icon(
                                             imageVector = Icons.Default.Info,
                                             contentDescription = null,
-                                            tint = EmeraldGreen,
+                                            tint = Color(0xFFB45309),
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = if (isTamil) {
-                                                "படிவம் 1 பயணக் குறிப்பேட்டில் இப்பதிவு '$nonTravelReasonText' என்று பதிவாகும். TA பில்லில் கட்டணம் சேராது."
+                                                "இம்மூன்றுக்கும் பயணப்படி (TA) க்ளைம் கிடையாது (₹0). படிவம் 1 பயணக் குறிப்பேட்டில் மட்டும் '${nonTravelReasonText.trim().ifBlank { selectedNonTravelType }}' எனப் பதிவாகும்."
                                             } else {
-                                                "Recorded as '$nonTravelReasonText' in Form 1 Diary. Excluded from TA travel claims."
+                                                "No TA allowance claimed for these three (₹0). Recorded in Form 1 Tour Diary only as '${nonTravelReasonText.trim().ifBlank { selectedNonTravelType }}'."
                                             },
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF166534),
-                                            lineHeight = 15.sp
+                                            fontSize = 11.5.sp,
+                                            color = Color(0xFF92400E),
+                                            lineHeight = 16.sp,
+                                            fontWeight = FontWeight.Medium
                                         )
                                     }
                                 }
@@ -1390,7 +1368,7 @@ fun QuickTourEntryDialog(
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = when (selectedNonTravelType) {
-                                                "தற்செயல்விடுப்பு" -> CrimsonRed
+                                                "தற்செயல் விடுப்பு", "தற்செயல்விடுப்பு" -> CrimsonRed
                                                 "விடுமுறை" -> AmberDark
                                                 else -> BlueAccent
                                             }
@@ -2149,7 +2127,7 @@ fun QuickTourEntryDialog(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (entryMode == "LEAVE") {
                             when (selectedNonTravelType) {
-                                "தற்செயல்விடுப்பு" -> CrimsonRed
+                                "தற்செயல் விடுப்பு", "தற்செயல்விடுப்பு" -> CrimsonRed
                                 "விடுமுறை" -> AmberDark
                                 else -> BlueAccent
                             }
