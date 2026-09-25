@@ -28,16 +28,9 @@ class TaBillRepository(private val dao: TaBillDao) {
     }
 
     suspend fun initializeDefaultDataIfNeeded() = withContext(Dispatchers.IO) {
-        // Seed schools if empty or refresh if old categories, empty village names, or outdated school names exist
-        val firstSchool = dao.getSchoolByCode("33230505405")
-        val needsSchoolRefresh = dao.getSchoolCount() == 0 ||
-                dao.getOldCategorySchoolCount() > 0 ||
-                dao.getSchoolsWithEmptyVillageCount() > 0 ||
-                firstSchool?.nameEn != "HAMEEDIA PRIMARY SCHOOL SALAIYUR" ||
-                firstSchool?.villageTa != "இளையான்குடி ஹமீதியா"
-
-        if (needsSchoolRefresh) {
-            dao.deleteAllSchools()
+        // Seed schools only if schools table is empty
+        val schoolCount = dao.getSchoolCount()
+        if (schoolCount == 0) {
             dao.insertSchools(SchoolSeedData.initialSchools)
         }
 
@@ -280,6 +273,24 @@ class TaBillRepository(private val dao: TaBillDao) {
 
     suspend fun insertSchool(school: School) = withContext(Dispatchers.IO) {
         dao.insertSchool(school)
+    }
+
+    suspend fun insertSchools(schools: List<School>) = withContext(Dispatchers.IO) {
+        dao.insertSchools(schools)
+    }
+
+    suspend fun replaceAllSchools(newSchools: List<School>) = withContext(Dispatchers.IO) {
+        dao.deleteAllSchools()
+        dao.insertSchools(newSchools)
+    }
+
+    suspend fun resetSchoolsToDefault() = withContext(Dispatchers.IO) {
+        dao.deleteAllSchools()
+        dao.insertSchools(SchoolSeedData.initialSchools)
+    }
+
+    suspend fun deleteAllSchools() = withContext(Dispatchers.IO) {
+        dao.deleteAllSchools()
     }
 
     suspend fun updateSchool(school: School) = withContext(Dispatchers.IO) {

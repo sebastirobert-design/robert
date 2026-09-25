@@ -11,17 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.TableChart
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -40,6 +29,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.AppBottomNavBar
 import com.example.ui.components.AppHeader
 import com.example.ui.components.BackupChoiceDialog
 import com.example.ui.components.PrintOptionsDialog
@@ -102,6 +92,14 @@ fun TaBillApp(viewModel: TaBillViewModel) {
         }
     }
 
+    val importSchoolCsvLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.inspectSchoolCsvFromUri(context, uri)
+        }
+    }
+
     // Show feedback messages as snackbar
     LaunchedEffect(uiState.userFeedbackMessage) {
         uiState.userFeedbackMessage?.let { message ->
@@ -133,75 +131,11 @@ fun TaBillApp(viewModel: TaBillViewModel) {
             )
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = Navy900,
-                tonalElevation = 8.dp,
-                modifier = Modifier.testTag("bottom_nav_bar")
-            ) {
-                // Tab 0: Home (முகப்பு)
-                NavigationBarItem(
-                    selected = uiState.activeTab == 0,
-                    onClick = { viewModel.setActiveTab(0) },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-                    label = { Text(if (isTa) "முகப்பு" else "Home", fontSize = 10.sp, fontWeight = if (uiState.activeTab == 0) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Navy900,
-                        selectedTextColor = GoldAccent,
-                        indicatorColor = GoldAccent,
-                        unselectedIconColor = Color(0xFF90A4AE),
-                        unselectedTextColor = Color(0xFF90A4AE)
-                    ),
-                    modifier = Modifier.testTag("nav_item_home")
-                )
-
-                // Tab 1: Form 1 Diary (படிவம் 1)
-                NavigationBarItem(
-                    selected = uiState.activeTab == 1,
-                    onClick = { viewModel.setActiveTab(1) },
-                    icon = { Icon(Icons.Default.Article, contentDescription = "Diary") },
-                    label = { Text(if (isTa) "படிவம் 1" else "Form 1", fontSize = 10.sp, fontWeight = if (uiState.activeTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Navy900,
-                        selectedTextColor = GoldAccent,
-                        indicatorColor = GoldAccent,
-                        unselectedIconColor = Color(0xFF90A4AE),
-                        unselectedTextColor = Color(0xFF90A4AE)
-                    ),
-                    modifier = Modifier.testTag("nav_item_form1")
-                )
-
-                // Tab 2: Form 2 TA Bill (படிவம் 2)
-                NavigationBarItem(
-                    selected = uiState.activeTab == 2,
-                    onClick = { viewModel.setActiveTab(2) },
-                    icon = { Icon(Icons.Default.Description, contentDescription = "TA Bill") },
-                    label = { Text(if (isTa) "படிவம் 2" else "Form 2", fontSize = 10.sp, fontWeight = if (uiState.activeTab == 2) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Navy900,
-                        selectedTextColor = GoldAccent,
-                        indicatorColor = GoldAccent,
-                        unselectedIconColor = Color(0xFF90A4AE),
-                        unselectedTextColor = Color(0xFF90A4AE)
-                    ),
-                    modifier = Modifier.testTag("nav_item_form2")
-                )
-
-                // Tab 3: Settings (அமைப்புகள் - பள்ளிகள், அலுவலர் & போக்குவரத்து படி விகிதம் உள்ளடக்கியது)
-                NavigationBarItem(
-                    selected = uiState.activeTab == 3,
-                    onClick = { viewModel.setActiveTab(3) },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                    label = { Text(if (isTa) "அமைப்புகள்" else "Settings", fontSize = 10.sp, fontWeight = if (uiState.activeTab == 3) FontWeight.Bold else FontWeight.Normal) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Navy900,
-                        selectedTextColor = GoldAccent,
-                        indicatorColor = GoldAccent,
-                        unselectedIconColor = Color(0xFF90A4AE),
-                        unselectedTextColor = Color(0xFF90A4AE)
-                    ),
-                    modifier = Modifier.testTag("nav_item_settings")
-                )
-            }
+            AppBottomNavBar(
+                activeTab = uiState.activeTab,
+                isTamil = isTa,
+                onTabSelected = { viewModel.setActiveTab(it) }
+            )
         }
     ) { innerPadding ->
         Box(
@@ -253,7 +187,18 @@ fun TaBillApp(viewModel: TaBillViewModel) {
                     onBackupToDrive = { viewModel.openBackupOptionsDialog() },
                     onRestoreFromDrive = {
                         restoreBackupLauncher.launch(arrayOf("application/json", "*/*"))
-                    }
+                    },
+                    onImportSchoolCsv = {
+                        importSchoolCsvLauncher.launch(arrayOf("text/*", "text/csv", "application/csv", "*/*"))
+                    },
+                    onDownloadSchoolCsvTemplate = { viewModel.downloadSchoolCsvTemplate(context) },
+                    onExportSchoolsToCsv = { viewModel.exportCurrentSchoolsToCsv(context) },
+                    onResetSchoolsToDefault = { viewModel.resetSchoolsToDefault() },
+                    onRunAiSchoolValidation = { viewModel.runAiSchoolValidation() },
+                    onConfirmImportSchools = { replaceExisting -> viewModel.confirmImportSchools(replaceExisting) },
+                    onDismissSchoolCsvDialog = { viewModel.dismissSchoolCsvDialog() },
+                    onAutoFixSchoolIssues = { viewModel.autoFixSchoolIssues() },
+                    onDismissAiAuditDialog = { viewModel.dismissAiAuditDialog() }
                 )
                 5 -> ReportsDashboardScreen(
                     uiState = uiState,

@@ -213,4 +213,103 @@ class ExampleUnitTest {
     )
     assertFalse(otherModeTour.isTaEligible)
   }
+
+  @Test
+  fun testSchoolCsvTemplate_hasExpectedHeadersAndSampleRows() {
+    val template = com.example.util.SchoolCsvHelper.generateSampleSchoolCsvTemplate()
+    assertTrue(template.startsWith('\uFEFF'))
+    assertTrue(template.contains("Distance from HQ (km)") || template.contains("தலைமையிட தூரம்"))
+    assertTrue(template.contains("Default Bus Fare (Rs)") || template.contains("பேருந்து கட்டணம்"))
+    assertTrue(template.contains("UDISE"))
+
+    val parsed = com.example.util.SchoolCsvHelper.parseSchoolsFromCsv(template)
+    assertTrue("Should parse at least 5 schools from template", parsed.schools.size >= 5)
+    val firstSchool = parsed.schools.first()
+    assertTrue(firstSchool.nameTa.isNotBlank() || firstSchool.nameEn.isNotBlank())
+    assertTrue(firstSchool.distanceFromHqKm > 0)
+    assertTrue(firstSchool.defaultBusFare > 0)
+  }
+
+  @Test
+  fun testSchoolCsvExportAndParse_roundtrip() {
+    val schools = listOf(
+        com.example.data.model.School(
+            id = 1,
+            serialNo = 1,
+            code = "33240100101",
+            nameEn = "PUPS ANDIPATTI",
+            nameTa = "ஊராட்சி ஒன்றிய தொடக்கப் பள்ளி ஆண்டிபட்டி",
+            category = "BEO_I",
+            villageEn = "ANDIPATTI",
+            villageTa = "ஆண்டிபட்டி",
+            distanceFromHqKm = 10,
+            defaultBusFare = 10
+        ),
+        com.example.data.model.School(
+            id = 2,
+            serialNo = 2,
+            code = "33240100201",
+            nameEn = "PUMS VARUSANADU",
+            nameTa = "ஊராட்சி ஒன்றிய நடுநிலைப் பள்ளி வருசநாடு",
+            category = "BEO_II",
+            villageEn = "VARUSANADU",
+            villageTa = "வருசநாடு",
+            distanceFromHqKm = 24,
+            defaultBusFare = 20
+        )
+    )
+
+    val exportedCsv = com.example.util.SchoolCsvHelper.exportSchoolsToCsv(schools)
+    val parseResult = com.example.util.SchoolCsvHelper.parseSchoolsFromCsv(exportedCsv)
+
+    assertEquals(2, parseResult.schools.size)
+    assertEquals("PUPS ANDIPATTI", parseResult.schools[0].nameEn)
+    assertEquals(10, parseResult.schools[0].distanceFromHqKm)
+    assertEquals(10, parseResult.schools[0].defaultBusFare)
+    assertEquals(24, parseResult.schools[1].distanceFromHqKm)
+    assertEquals(20, parseResult.schools[1].defaultBusFare)
+  }
+
+  @Test
+  fun testSchoolAiValidator_detectsAnomalies() = kotlinx.coroutines.runBlocking {
+    val schools = listOf(
+        // Anomaly: 0 km distance but fare is 25
+        com.example.data.model.School(
+            id = 1,
+            serialNo = 1,
+            nameTa = "தலைமையிடம் அலுவலகம்",
+            nameEn = "HQ Office",
+            villageTa = "தலைமையிடம்",
+            distanceFromHqKm = 0,
+            defaultBusFare = 25
+        ),
+        // Normal outstation school (> 8 km)
+        com.example.data.model.School(
+            id = 2,
+            serialNo = 2,
+            nameTa = "தொடக்கப் பள்ளி ஆண்டிபட்டி",
+            nameEn = "PS ANDIPATTI",
+            villageTa = "ஆண்டிபட்டி",
+            distanceFromHqKm = 16,
+            defaultBusFare = 15
+        ),
+        // Anomaly: 20 km distance but fare is 0
+        com.example.data.model.School(
+            id = 3,
+            serialNo = 3,
+            nameTa = "நடுநிலைப் பள்ளி மயிலாடும்பாறை",
+            nameEn = "MS MAYILAI",
+            villageTa = "மயிலாடும்பாறை",
+            distanceFromHqKm = 20,
+            defaultBusFare = 0
+        )
+    )
+
+    val report = com.example.util.SchoolAiValidator.auditSchools(schools, apiKey = "")
+    assertEquals(3, report.totalSchools)
+    assertEquals(1, report.localRadiusCount)
+    assertEquals(2, report.outstationCount)
+    assertTrue("Should detect fare anomaly for 0km with ₹25 and 20km with ₹0", report.issues.isNotEmpty())
+    assertTrue(report.aiNarrativeSummaryTa.isNotBlank())
+  }
 }

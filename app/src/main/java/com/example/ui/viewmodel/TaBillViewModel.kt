@@ -55,6 +55,13 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
     private val _showBackupOptionsDialog = MutableStateFlow<Boolean>(false)
     val showBackupOptionsDialog: StateFlow<Boolean> = _showBackupOptionsDialog.asStateFlow()
 
+    // Schools CSV & AI Verification States
+    private val _pendingCsvSchools = MutableStateFlow<com.example.util.SchoolCsvHelper.ParseSchoolResult?>(null)
+    private val _showSchoolCsvImportDialog = MutableStateFlow<Boolean>(false)
+    private val _aiAuditReport = MutableStateFlow<com.example.util.SchoolAiValidator.AiAuditReport?>(null)
+    private val _isAiValidating = MutableStateFlow<Boolean>(false)
+    private val _showAiAuditDialog = MutableStateFlow<Boolean>(false)
+
     val uiState: StateFlow<TaBillUiState>
 
     init {
@@ -87,7 +94,12 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
             _editingTourEntry,
             _schoolSearchQuery,
             _feedbackMessage,
-            _quickTourInitialMode
+            _quickTourInitialMode,
+            _pendingCsvSchools,
+            _showSchoolCsvImportDialog,
+            _aiAuditReport,
+            _isAiValidating,
+            _showAiAuditDialog
         ) { args: Array<Any?> ->
             DialogControlState(
                 selectedCalendar = args[0] as Calendar,
@@ -100,7 +112,12 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
                 editingEntry = args[7] as TourEntry?,
                 searchQuery = args[8] as String,
                 feedback = args[9] as String?,
-                quickTourInitialMode = args[10] as String
+                quickTourInitialMode = args[10] as String,
+                pendingCsvSchools = args[11] as com.example.util.SchoolCsvHelper.ParseSchoolResult?,
+                showSchoolCsvImportDialog = args[12] as Boolean,
+                aiAuditReport = args[13] as com.example.util.SchoolAiValidator.AiAuditReport?,
+                isAiValidating = args[14] as Boolean,
+                showAiAuditDialog = args[15] as Boolean
             )
         }
 
@@ -152,7 +169,12 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
                 showSchoolPickerSheet = ctrl.showSchoolPicker,
                 editingTourEntry = ctrl.editingEntry,
                 schoolSearchQuery = ctrl.searchQuery,
-                userFeedbackMessage = ctrl.feedback
+                userFeedbackMessage = ctrl.feedback,
+                pendingCsvSchools = ctrl.pendingCsvSchools,
+                showSchoolCsvImportDialog = ctrl.showSchoolCsvImportDialog,
+                aiAuditReport = ctrl.aiAuditReport,
+                isAiValidating = ctrl.isAiValidating,
+                showAiAuditDialog = ctrl.showAiAuditDialog
             )
         }.stateIn(
             scope = viewModelScope,
@@ -690,6 +712,188 @@ class TaBillViewModel(application: Application) : AndroidViewModel(application) 
     fun dismissRestoreDialog() {
         _pendingRestoreData.value = null
     }
+
+    // ==================== SCHOOLS CSV MANAGEMENT ====================
+
+    fun downloadSchoolCsvTemplate(context: Context) {
+        val template = com.example.util.SchoolCsvHelper.generateSampleSchoolCsvTemplate()
+        com.example.util.SchoolCsvHelper.shareCsvFile(
+            context = context,
+            csvContent = template,
+            fileName = "Schools_Template_TN_BEO.csv",
+            title = if (uiState.value.isTamil) "மாதிரி பள்ளிகள் CSV கோப்பு" else "Schools Sample CSV Template"
+        )
+        _feedbackMessage.value = if (uiState.value.isTamil) {
+            "மாதிரி பள்ளிகள் CSV கோப்பு பகிரப்பட்டது (Google Sheets / Excel-ல் திறந்து உங்கள் ஒன்றிய பள்ளிகளை நிரப்பலாம்)"
+        } else {
+            "Sample schools CSV template shared"
+        }
+    }
+
+    fun exportCurrentSchoolsToCsv(context: Context) {
+        val schools = uiState.value.allSchools
+        if (schools.isEmpty()) {
+            _feedbackMessage.value = if (uiState.value.isTamil) "ஏற்றுமதி செய்ய பள்ளிகள் ஏதுமில்லை" else "No schools to export"
+            return
+        }
+        val csv = com.example.util.SchoolCsvHelper.exportSchoolsToCsv(schools)
+        val fileName = "BEO_Schools_${DateUtils.getCurrentMonthYear().replace("-", "_")}.csv"
+        com.example.util.SchoolCsvHelper.shareCsvFile(
+            context = context,
+            csvContent = csv,
+            fileName = fileName,
+            title = if (uiState.value.isTamil) "பள்ளிகள் பட்டியல் CSV" else "Schools Directory CSV"
+        )
+        _feedbackMessage.value = if (uiState.value.isTamil) {
+            "${schools.size} பள்ளிகள் CSV கோப்பாக ஏற்றுமதி செய்யப்பட்டது"
+        } else {
+            "${schools.size} schools exported as CSV"
+        }
+    }
+
+    fun inspectSchoolCsvFromUri(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val csvContent = com.example.util.SchoolCsvHelper.readCsvFromUri(context, uri)
+                val parseResult = com.example.util.SchoolCsvHelper.parseSchoolsFromCsv(csvContent)
+                _pendingCsvSchools.value = parseResult
+                _showSchoolCsvImportDialog.value = true
+            } catch (e: Exception) {
+                _feedbackMessage.value = "CSV படிப்பதில் பிழை: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun confirmImportSchools(replaceExisting: Boolean) {
+        val pending = _pendingCsvSchools.value ?: return
+        val newSchools = pending.schools
+        if (newSchools.isEmpty()) {
+            _showSchoolCsvImportDialog.value = false
+            _pendingCsvSchools.value = null
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                if (replaceExisting) {
+                    repository.replaceAllSchools(newSchools)
+                } else {
+                    repository.insertSchools(newSchools)
+                }
+                _showSchoolCsvImportDialog.value = false
+                _pendingCsvSchools.value = null
+                _feedbackMessage.value = if (uiState.value.isTamil) {
+                    if (replaceExisting) {
+                        "பழைய பள்ளிகள் நீக்கப்பட்டு புதிய ${newSchools.size} பள்ளிகள் தலைமையிட தூரத்தோடு வெற்றிகரமாக ஏற்றப்பட்டன!"
+                    } else {
+                        "புதிய ${newSchools.size} பள்ளிகள் சேர்க்கப்பட்டன!"
+                    }
+                } else {
+                    "${newSchools.size} schools imported successfully!"
+                }
+            } catch (e: Exception) {
+                _feedbackMessage.value = "பள்ளிகள் பதிவேற்றத்தில் பிழை: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun dismissSchoolCsvDialog() {
+        _showSchoolCsvImportDialog.value = false
+        _pendingCsvSchools.value = null
+    }
+
+    fun resetSchoolsToDefault() {
+        viewModelScope.launch {
+            try {
+                repository.resetSchoolsToDefault()
+                _feedbackMessage.value = if (uiState.value.isTamil) {
+                    "மாதிரி பள்ளிகள் (119 பள்ளிகள்) மீட்டமைக்கப்பட்டது"
+                } else {
+                    "Default schools restored"
+                }
+            } catch (e: Exception) {
+                _feedbackMessage.value = "Error: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    // ==================== AI SCHOOL VALIDATION ====================
+
+    fun runAiSchoolValidation() {
+        viewModelScope.launch {
+            _isAiValidating.value = true
+            _showAiAuditDialog.value = true
+            try {
+                val report = com.example.util.SchoolAiValidator.auditSchools(uiState.value.allSchools)
+                _aiAuditReport.value = report
+            } catch (e: Exception) {
+                _feedbackMessage.value = "AI சரிபார்ப்பில் பிழை: ${e.localizedMessage}"
+            } finally {
+                _isAiValidating.value = false
+            }
+        }
+    }
+
+    fun dismissAiAuditDialog() {
+        _showAiAuditDialog.value = false
+    }
+
+    fun autoFixSchoolIssues() {
+        viewModelScope.launch {
+            try {
+                val currentSchools = uiState.value.allSchools
+                var fixedCount = 0
+                val updatedSchools = currentSchools.map { school ->
+                    var changed = false
+                    var fixedTown = school.villageTa
+                    var fixedFare = school.defaultBusFare
+
+                    if (fixedTown.isBlank()) {
+                        fixedTown = School.extractVillageName(school.nameTa)
+                        changed = true
+                    }
+                    if (school.distanceFromHqKm == 0 && fixedFare > 0) {
+                        fixedFare = 0
+                        changed = true
+                    } else if (school.distanceFromHqKm > 5 && fixedFare == 0) {
+                        fixedFare = when {
+                            school.distanceFromHqKm <= 10 -> 10
+                            school.distanceFromHqKm <= 18 -> 15
+                            school.distanceFromHqKm <= 25 -> 20
+                            else -> 25
+                        }
+                        changed = true
+                    }
+
+                    if (changed) {
+                        fixedCount++
+                        school.copy(
+                            villageTa = fixedTown,
+                            villageEn = if (school.villageEn.isBlank()) School.extractVillageName(school.nameEn) else school.villageEn,
+                            defaultBusFare = fixedFare
+                        )
+                    } else {
+                        school
+                    }
+                }
+
+                if (fixedCount > 0) {
+                    repository.replaceAllSchools(updatedSchools)
+                    val report = com.example.util.SchoolAiValidator.auditSchools(updatedSchools)
+                    _aiAuditReport.value = report
+                    _feedbackMessage.value = if (uiState.value.isTamil) {
+                        "$fixedCount பள்ளிகளின் முரண்பாடுகள் தானாக சரிசெய்யப்பட்டன!"
+                    } else {
+                        "Auto-fixed $fixedCount school issues!"
+                    }
+                } else {
+                    _feedbackMessage.value = if (uiState.value.isTamil) "சரிசெய்ய வேண்டிய முரண்பாடுகள் ஏதுமில்லை" else "No issues to fix"
+                }
+            } catch (e: Exception) {
+                _feedbackMessage.value = "Auto-fix error: ${e.localizedMessage}"
+            }
+        }
+    }
 }
 
 // Helper data classes for state combination
@@ -704,7 +908,12 @@ data class DialogControlState(
     val editingEntry: TourEntry?,
     val searchQuery: String,
     val feedback: String?,
-    val quickTourInitialMode: String = "TOUR"
+    val quickTourInitialMode: String = "TOUR",
+    val pendingCsvSchools: com.example.util.SchoolCsvHelper.ParseSchoolResult? = null,
+    val showSchoolCsvImportDialog: Boolean = false,
+    val aiAuditReport: com.example.util.SchoolAiValidator.AiAuditReport? = null,
+    val isAiValidating: Boolean = false,
+    val showAiAuditDialog: Boolean = false
 )
 
 data class AppFlowData(

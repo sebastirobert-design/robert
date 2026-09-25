@@ -26,7 +26,12 @@ data class TaBillUiState(
     val showSchoolPickerSheet: Boolean = false,
     val editingTourEntry: TourEntry? = null,
     val schoolSearchQuery: String = "",
-    val userFeedbackMessage: String? = null
+    val userFeedbackMessage: String? = null,
+    val pendingCsvSchools: com.example.util.SchoolCsvHelper.ParseSchoolResult? = null,
+    val showSchoolCsvImportDialog: Boolean = false,
+    val aiAuditReport: com.example.util.SchoolAiValidator.AiAuditReport? = null,
+    val isAiValidating: Boolean = false,
+    val showAiAuditDialog: Boolean = false
 ) {
     val isTamil: Boolean get() = appSettings.language == "ta"
 

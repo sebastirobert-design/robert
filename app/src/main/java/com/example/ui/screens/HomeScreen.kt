@@ -394,7 +394,8 @@ fun HomeScreen(
                     entry = entry,
                     isTamil = isTa,
                     onEdit = { onEditTour(entry) },
-                    onDelete = { onDeleteTour(entry) }
+                    onDelete = { onDeleteTour(entry) },
+                    modifier = Modifier.padding(vertical = 2.dp)
                 )
             }
         }
@@ -413,7 +414,7 @@ fun TourRowCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag("tour_card_${entry.id}"),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (entry.isNonTravel) {
                 if (entry.nonTravelType.contains("விடுமுறை")) Color(0xFFFFF8E1)
@@ -427,7 +428,7 @@ fun TourRowCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(8.dp)) {
             // Header Row: Date badge + Leg type + Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -436,22 +437,22 @@ fun TourRowCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(5.dp),
                         color = Navy900
                     ) {
                         Text(
                             text = entry.departureDate.take(5), // "02.07"
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.5.sp,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
 
                     if (entry.isNonTravel) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = if (entry.nonTravelType.contains("விடுமுறை")) AmberDark
                             else if (entry.nonTravelType.contains("தற்செயல்")) CrimsonRed
                             else BlueAccent
@@ -459,35 +460,35 @@ fun TourRowCard(
                             Text(
                                 text = entry.nonTravelType,
                                 color = Color.White,
-                                fontSize = 10.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
                             )
                         }
                     } else if (entry.isReturnLeg) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = Color(0xFF558B2F)
                         ) {
                             Text(
                                 text = if (isTamil) "மறுபயணம் (Return)" else "Return Leg",
                                 color = Color.White,
-                                fontSize = 10.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
                             )
                         }
                     } else {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = BlueAccent
                         ) {
                             Text(
                                 text = if (isTamil) "புறப்பாடு (Outbound)" else "Outbound",
                                 color = Color.White,
-                                fontSize = 10.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
                             )
                         }
                     }
@@ -496,26 +497,26 @@ fun TourRowCard(
                 Row {
                     IconButton(
                         onClick = onEdit,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(26.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(15.dp))
                     }
                     IconButton(
                         onClick = onDelete,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(26.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.size(15.dp))
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             // Body: Departure -> Arrival
             if (entry.isNonTravel) {
                 Text(
                     text = "${entry.departureStation} • ${entry.purposeOfJourney}",
-                    fontSize = 13.5.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
@@ -528,12 +529,12 @@ fun TourRowCard(
                         Text(
                             text = entry.departureStation,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             color = TextPrimary
                         )
                         Text(
                             text = entry.departureHour,
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             color = TextSecondary
                         )
                     }
@@ -543,26 +544,26 @@ fun TourRowCard(
                         contentDescription = "to",
                         tint = Navy700,
                         modifier = Modifier
-                            .padding(horizontal = 8.dp)
-                            .size(16.dp)
+                            .padding(horizontal = 6.dp)
+                            .size(14.dp)
                     )
 
                     Column(modifier = Modifier.weight(1.3f)) {
                         Text(
                             text = entry.arrivalStation,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
+                            fontSize = 12.5.sp,
                             color = TextPrimary
                         )
                         Text(
                             text = entry.arrivalHour,
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             color = TextSecondary
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Breakdown footer chips
                 Row(
@@ -570,16 +571,16 @@ fun TourRowCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             text = "${entry.distanceKm} km",
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             color = TextSecondary,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
                             text = "• ${entry.purposeOfJourney}",
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             color = TextSecondary
                         )
                     }

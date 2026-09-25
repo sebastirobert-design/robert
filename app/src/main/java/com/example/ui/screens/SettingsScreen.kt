@@ -94,6 +94,15 @@ fun SettingsScreen(
     onExportToCsv: () -> Unit = {},
     onBackupToDrive: () -> Unit = {},
     onRestoreFromDrive: () -> Unit = {},
+    onImportSchoolCsv: () -> Unit = {},
+    onDownloadSchoolCsvTemplate: () -> Unit = {},
+    onExportSchoolsToCsv: () -> Unit = {},
+    onResetSchoolsToDefault: () -> Unit = {},
+    onRunAiSchoolValidation: () -> Unit = {},
+    onConfirmImportSchools: (Boolean) -> Unit = {},
+    onDismissSchoolCsvDialog: () -> Unit = {},
+    onAutoFixSchoolIssues: () -> Unit = {},
+    onDismissAiAuditDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isTa = uiState.isTamil
@@ -197,6 +206,15 @@ fun SettingsScreen(
                     uiState = uiState,
                     onSaveSchool = onSaveSchool,
                     onDeleteSchool = onDeleteSchool,
+                    onImportCsv = onImportSchoolCsv,
+                    onDownloadCsvTemplate = onDownloadSchoolCsvTemplate,
+                    onExportCsv = onExportSchoolsToCsv,
+                    onResetToDefault = onResetSchoolsToDefault,
+                    onRunAiValidation = onRunAiSchoolValidation,
+                    onConfirmImportSchools = onConfirmImportSchools,
+                    onDismissSchoolCsvDialog = onDismissSchoolCsvDialog,
+                    onAutoFixSchoolIssues = onAutoFixSchoolIssues,
+                    onDismissAiAuditDialog = onDismissAiAuditDialog,
                     modifier = Modifier.fillMaxSize()
                 )
             }
